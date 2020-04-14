@@ -19,3 +19,32 @@ if(NOT MACROTHREADING_LIBRARY_NAME)
 
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/lib/macrothreading")
 endif()
+
+# Get the source files
+file(GLOB sources "src/*.c")
+
+if(ESP_PLATFORM)
+    if(__idf_component_context)
+        idf_component_register(
+            SRCS ${sources}
+            INCLUDE_DIRS "inc"
+        )
+    else()
+        set(IS_ESP_COMPONENT True)
+    endif()
+else()
+    # Include directory
+    include_directories(inc)
+
+    # Create the library
+    add_library(${SOCKET_SESSIONS_LIBRARY_NAME} ${sources})
+
+    # Link the library
+    target_link_libraries (${SOCKET_SESSIONS_LIBRARY_NAME} ${MACROTHREADING_LIBRARY_NAME})
+
+    # Check for top-level project
+    if(${PROJECT_NAME} STREQUAL ${CMAKE_PROJECT_NAME})
+        enable_testing()
+        add_subdirectory(test)
+    endif()
+endif()
