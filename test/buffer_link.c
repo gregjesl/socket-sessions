@@ -2,7 +2,7 @@
 #include "test.h"
 
 const char* test_string = "Hello World\0";
-const size_t length = 1024;
+const size_t length = 16;
 
 int main(void)
 {
@@ -31,6 +31,9 @@ int main(void)
     char echo[12];
     TEST_EQUAL(buffer_link_read(buf, echo, strlen(test_string)), strlen(test_string));
     TEST_STRING_EQUAL(echo, test_string);
+
+    // Write to the end
+    TEST_EQUAL(buffer_link_write(buf, test_string, strlen(test_string)), 16 - strlen(test_string));
 
     // Destroy
     buffer_link_destroy(buf);
