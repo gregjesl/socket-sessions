@@ -2,10 +2,8 @@ cmake_minimum_required (VERSION 3.8)
 
 project(socket-sessions)
 
-set(SOCKET_SESSIONS_LIBRARY_NAME ${PROJECT_NAME})
-
 # Load macrothreading
-if(NOT MACROTHREADING_LIBRARY_NAME)
+if(NOT TARGET macrothreading)
     # Check to see if the folder is already cloned
     if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lib/macrothreading)
         execute_process(COMMAND git pull origin master
@@ -37,10 +35,13 @@ else()
     include_directories(inc)
 
     # Create the library
-    add_library(${SOCKET_SESSIONS_LIBRARY_NAME} ${sources})
+    add_library(${PROJECT_NAME} ${sources})
 
     # Link the library
-    target_link_libraries (${SOCKET_SESSIONS_LIBRARY_NAME} ${MACROTHREADING_LIBRARY_NAME})
+    if(NOT TARGET macrothreading)
+        message(FATAL_ERROR "No macrothreading library found")
+    endif()
+    target_link_libraries (${PROJECT_NAME} PUBLIC macrothreading)
 
     # Check for top-level project
     if(${PROJECT_NAME} STREQUAL ${CMAKE_PROJECT_NAME})
