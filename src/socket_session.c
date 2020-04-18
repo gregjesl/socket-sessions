@@ -9,12 +9,13 @@
 #include <string.h>
 #include <fcntl.h>
 
-socket_session_t socket_session_init(int sock)
+socket_session_t socket_session_init()
 {
     socket_session_t result = (socket_session_t)malloc(sizeof(struct socket_session_struct));
-    result->socket = sock;
+    result->socket = 0;
     result->buffer = buffer_chain_init(1024);
-    result->connected = true;
+    result->connected = false;
+    result->context = NULL;
     return result;
 }
 
@@ -84,6 +85,47 @@ int socket_session_write(socket_session_t session, const char *data, const size_
     return length > 0 ? SOCKET_SESSION_DATA_WRITTEN : SOCKET_SESSION_NO_CHANGE;
 }
 
+void monitor_thread(void *arg)
+{
+    struct pollfd pfd;
+    socket_monitor_t monitor = (socket_monitor_t)arg;
+    memset(&pfd, 0, sizeof(struct pollfd));
+    pfd.fd = monitor->session->socket;
+    pfd.events = POLLIN;
+    while(monitor->monitor) {
+        if(poll(&pfd, 1, 10) > 0 && socket_session_read(monitor->session) == SOCKET_SESSION_DATA_READ) {
+            if(monitor->data_ready_callback != NULL) {
+                monitor->data_ready_callback(monitor->session);
+            }
+        }
+    }
+}
+
+socket_monitor_t socket_session_monitor(socket_session_t session, socket_session_callback data_ready, socket_session_callback closure_callback)
+{
+    socket_monitor_t result = (socket_monitor_t)malloc(sizeof(struct socket_monitor_struct));
+    result->session = session;
+    result->data_ready_callback = data_ready;
+    result->closure_callback = closure_callback;
+    result->monitor = true;
+    result->thread = macrothread_handle_init();
+    macrothread_start_thread(result->thread, monitor_thread, result);
+    return result;
+}
+
+void socket_session_stop_monitor(socket_monitor_t monitor)
+{
+    if(monitor->thread == NULL) {
+        perror("Null arguement");
+        exit(1);
+    }
+    monitor->monitor = false;
+    macrothread_join(monitor->thread);
+    macrothread_handle_destroy(monitor->thread);
+    monitor->thread = NULL;
+    free(monitor);
+}
+
 void socket_session_close(socket_session_t session)
 {
     #ifdef WIN32
@@ -101,68 +143,7 @@ void socket_session_destroy(socket_session_t session)
     free(session);
 }
 
-void socket_session_listen(int port, socket_session_callback callback, size_t queue, bool *cancellation)
-{
-    int sockfd, newsockfd, portno;
-    socklen_t clilen;
-    struct sockaddr_in serv_addr, cli_addr;
-    socket_session_t newsession;
-   
-    /* First call to socket() function */
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-
-    if (sockfd < 0) {
-        perror("ERROR opening socket");
-        exit(1);
-    }
-
-    /* Initialize socket structure */
-    memset((char *) &serv_addr, 0, sizeof(serv_addr));
-
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(port);
-
-    /* Now bind the host address using bind() call.*/
-    if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-        perror("ERROR on binding");
-        exit(1);
-    }
-        
-    /* Now start listening for the clients, here process will
-        * go in sleep mode and will wait for the incoming connection
-    */
-
-    while(!*cancellation) {
-        listen(sockfd, queue);
-
-        if(!*cancellation) {
-            clilen = sizeof(cli_addr);
-   
-            /* Accept actual connection from the client */
-            newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-                
-            if (newsockfd < 0) {
-                perror("ERROR on accept");
-                exit(1);
-            }
-
-            socket_session_t newsession = socket_session_init(newsockfd);
-
-            // Call the callback
-            callback(newsession); 
-        }
-    }
-
-    #ifdef WIN32
-    closesocket(sockfd);
-    WSACleanup();
-    #else
-    close(sockfd);
-    #endif
-}
-
-socket_session_t socket_session_connect(const char *address, const int port)
+void socket_session_connect(socket_session_t session, const char *address, const int port)
 {
     int sock = 0; 
     struct sockaddr_in serv_addr; 
@@ -188,5 +169,6 @@ socket_session_t socket_session_connect(const char *address, const int port)
         exit(1);
     }
 
-    return socket_session_init(sock);
+    session->connected = true;
+    session->socket = sock;
 }

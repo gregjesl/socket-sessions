@@ -1,4 +1,5 @@
 #include "socket_session.h"
+#include "socket_listener.h"
 #include "macrothreading_thread.h"
 #include "macrothreading_condition.h"
 #include "test.h"
@@ -7,61 +8,53 @@ bool cancellation = false;
 int port = 8081;
 macrothread_condition_t callback_signal;
 macrothread_condition_t echo_signal;
-socket_session_t server_session = NULL;
 const char *test_phrase = "Hello World!\0";
 
-void callback(socket_session_t session)
+void client_data_callback(socket_session_t session)
 {
-    server_session = session;
-    socket_session_write(session, test_phrase, strlen(test_phrase));
-    macrothread_condition_signal(callback_signal);
-    macrothread_condition_wait(echo_signal);
     char echo[13];
-    TEST_EQUAL(socket_session_read(session), SOCKET_SESSION_DATA_READ);
     TEST_EQUAL(buffer_chain_read(session->buffer, echo, strlen(test_phrase)), strlen(test_phrase));
     TEST_STRING_EQUAL(echo, test_phrase);
+    macrothread_condition_signal(callback_signal);
 }
 
-void listener(void* args)
+void server_data_callback(socket_session_t session)
 {
-    socket_session_listen(port, callback, 5, &cancellation);
+    // Verify the message
+    char echo[13];
+    TEST_EQUAL(buffer_chain_read(session->buffer, echo, strlen(test_phrase)), strlen(test_phrase));
+    TEST_STRING_EQUAL(echo, test_phrase);
+
+    // Send the message
+    socket_session_write(session, test_phrase, strlen(test_phrase));
+}
+
+void server_connect_callback(socket_session_t session)
+{
+    socket_session_monitor(session, server_data_callback, NULL);
 }
 
 int main(void)
 {
     callback_signal = macrothread_condition_init();
-    echo_signal = macrothread_condition_init();
 
     // Start the listener
-    macrothread_handle_t listen_handle = macrothread_handle_init();
-    macrothread_start_thread(listen_handle, listener, NULL);
+    socket_listener_t listener = socket_listener_start(port, 5, server_connect_callback); 
 
     // Connect
-    socket_session_t client = socket_session_connect("127.0.0.1", port);
-    macrothread_condition_wait(callback_signal);
-    TEST_NOT_NULL(server_session);
+    socket_session_t client = socket_session_init();
+    socket_session_connect(client, "127.0.0.1", port);
+    socket_monitor_t client_monitor = socket_session_monitor(client, client_data_callback, NULL);
 
-    // Read
-    TEST_EQUAL(socket_session_read(client), SOCKET_SESSION_DATA_READ);
-
-    // Signal shutdown
-    cancellation = true;
-
-    // Get the string
-    char echo[13];
-    TEST_EQUAL(buffer_chain_read(client->buffer, echo, strlen(test_phrase)), strlen(test_phrase));
-    TEST_STRING_EQUAL(echo, test_phrase);
-
-    // Write the string
+    // Send the data
     socket_session_write(client, test_phrase, strlen(test_phrase));
-    macrothread_condition_signal(echo_signal);
 
-    // Join the thread
-    macrothread_join(listen_handle);
+    // Wait for the response
+    macrothread_condition_wait(callback_signal);
 
     // Cleanup
+    socket_session_stop_monitor(client_monitor);
+    socket_listener_stop(listener);
     macrothread_condition_destroy(callback_signal);
-    macrothread_condition_destroy(echo_signal);
-    macrothread_handle_destroy(listen_handle);
-    socket_session_destroy(server_session);
+    socket_session_destroy(client);
 }
