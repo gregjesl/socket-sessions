@@ -22,6 +22,7 @@ socket_session_t socket_session_init()
 int socket_session_read(socket_session_t session)
 {
     struct pollfd pfd;
+    int pollreturn;
     char buffer[1024];
     ssize_t bytes_read;
     size_t total_bytes_read = 0;
@@ -35,15 +36,26 @@ int socket_session_read(socket_session_t session)
 
     while(poll(&pfd, 1, 0) > 0)
     {
-        #ifdef WIN32
-        bytes_read = recv(session->socket, buffer, 1024, 0);
-        #else
-        bytes_read = read(session->socket, buffer, 1024);
-        #endif
+        if(pfd.revents & POLLIN) {
+            #ifdef WIN32
+            bytes_read = recv(session->socket, buffer, 1024, 0);
+            #else
+            bytes_read = read(session->socket, buffer, 1024);
+            #endif
 
-        if(bytes_read > 0) {
-            buffer_chain_write(session->buffer, buffer, bytes_read);
-            total_bytes_read += bytes_read;
+            if(bytes_read > 0) {
+                buffer_chain_write(session->buffer, buffer, bytes_read);
+                total_bytes_read += bytes_read;
+            }
+        }
+
+        if(pfd.revents & POLLHUP) {
+            socket_session_close(session);
+            break;
+        }
+
+        if(pfd.revents & POLLERR) {
+            perror("Poll error");
         }
     }
     
@@ -88,15 +100,43 @@ int socket_session_write(socket_session_t session, const char *data, const size_
 void monitor_thread(void *arg)
 {
     struct pollfd pfd;
+    int result;
     socket_monitor_t monitor = (socket_monitor_t)arg;
     memset(&pfd, 0, sizeof(struct pollfd));
     pfd.fd = monitor->session->socket;
     pfd.events = POLLIN;
     while(monitor->monitor) {
-        if(poll(&pfd, 1, 10) > 0 && socket_session_read(monitor->session) == SOCKET_SESSION_DATA_READ) {
-            if(monitor->data_ready_callback != NULL) {
-                monitor->data_ready_callback(monitor->session);
+        result = poll(&pfd, 1, 10);
+        if(result > 0) {
+            if(pfd.revents & POLLIN) {
+                if(socket_session_read(monitor->session) == SOCKET_SESSION_DATA_READ
+                && monitor->data_ready_callback != NULL) {
+                    monitor->data_ready_callback(monitor->session);
+                }
             }
+
+            if(pfd.revents & POLLHUP) {
+                socket_session_close(monitor->session);
+                if(monitor->closure_callback != NULL) {
+                    monitor->closure_callback(monitor->session);
+                }
+                monitor->monitor = false;
+            }
+
+            if(pfd.revents & POLLNVAL) {
+                perror("Polled socket that is closed");
+                monitor->monitor = false;
+            }
+
+            if(pfd.revents & POLLERR) {
+                perror("Poll error");
+                monitor->monitor = false;
+            }
+        } else if(result == 0) {
+            continue;
+        } else {
+            perror("Error encountered");
+            monitor->monitor = false;
         }
     }
 }

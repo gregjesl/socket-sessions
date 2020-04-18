@@ -7,8 +7,9 @@
 bool cancellation = false;
 int port = 8081;
 macrothread_condition_t callback_signal;
-macrothread_condition_t echo_signal;
+macrothread_condition_t close_signal;
 const char *test_phrase = "Hello World!\0";
+socket_monitor_t server_monitor;
 
 void client_data_callback(socket_session_t session)
 {
@@ -29,14 +30,20 @@ void server_data_callback(socket_session_t session)
     socket_session_write(session, test_phrase, strlen(test_phrase));
 }
 
+void server_close_callback(socket_session_t session) 
+{
+    macrothread_condition_signal(close_signal);
+}
+
 void server_connect_callback(socket_session_t session)
 {
-    socket_session_monitor(session, server_data_callback, NULL);
+    server_monitor = socket_session_monitor(session, server_data_callback, server_close_callback);
 }
 
 int main(void)
 {
     callback_signal = macrothread_condition_init();
+    close_signal = macrothread_condition_init();
 
     // Start the listener
     socket_listener_t listener = socket_listener_start(port, 5, server_connect_callback); 
@@ -52,9 +59,16 @@ int main(void)
     // Wait for the response
     macrothread_condition_wait(callback_signal);
 
-    // Cleanup
+    // Close the connection
     socket_session_stop_monitor(client_monitor);
+    socket_session_close(client);
+    macrothread_condition_wait(close_signal);
+
+
+    // Cleanup
+    socket_session_stop_monitor(server_monitor);
     socket_listener_stop(listener);
     macrothread_condition_destroy(callback_signal);
+    macrothread_condition_destroy(close_signal);
     socket_session_destroy(client);
 }
