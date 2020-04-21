@@ -32,17 +32,20 @@ void socket_listener_thread(void *arg)
                 exit(1);
             }
 
-            socket_session_t newsession = socket_session_init();
-            newsession->connected = true;
-            newsession->socket = newsockfd;
+            socket_session_t result = (socket_session_t)malloc(sizeof(struct socket_session_struct));
+            result->socket = socket_wrapper_init(newsockfd);
+            result->data_ready_callback = NULL;
+            result->closure_callback = NULL;
+            result->monitor = false;
+            result->thread = NULL;
 
             // Call the callback
-            handle->connection_callback(newsession); 
+            handle->connection_callback(result); 
         }
     }
 }
 
-socket_listener_t socket_listener_start(int port, int queue, socket_session_callback callback)
+socket_listener_t socket_listener_start(int port, int queue, socket_listener_callback callback)
 {
     int sockfd, portno;
     struct sockaddr_in serv_addr;
@@ -86,30 +89,20 @@ void socket_listener_stop(socket_listener_t listener)
 {
     if(listener == NULL) {
         perror("Socket listener handle is NULL");
-        exit(1);
+        return;
     }
 
     // Set the cancellation flag
     listener->cancellation = true;
 
     // Connect to the listener
-    socket_session_t cancel_session = socket_session_init();
-    socket_session_connect(cancel_session, "127.0.0.1", listener->port);
+    socket_session_t cancel_session = socket_session_connect("127.0.0.1", listener->port);
     
     // Wait for the thread to join
     macrothread_join(listener->thread);
 
     // Close the socket
     socket_session_close(cancel_session);
-
-    // Destroy the socket
-    socket_session_destroy(cancel_session);
-    #ifdef WIN32
-    closesocket(listener->sockfd);
-    WSACleanup();
-    #else
-    close(listener->sockfd);
-    #endif
 
     // Destroy the thread handle
     macrothread_handle_destroy(listener->thread);
