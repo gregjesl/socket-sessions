@@ -13,21 +13,24 @@ socket_session_t server_session;
 
 void client_data_callback(socket_wrapper_t session)
 {
-    char echo[13];
-    TEST_EQUAL(buffer_chain_read(session->buffer, echo, strlen(test_phrase)), strlen(test_phrase));
-    TEST_STRING_EQUAL(echo, test_phrase);
-    macrothread_condition_signal(callback_signal);
+    socket_wrapper_buffer(session);
+    if(session->buffer->length == strlen(test_phrase)) {
+        TEST_STRING_EQUAL(session->buffer->data, test_phrase);
+        macrothread_condition_signal(callback_signal);
+    }
 }
 
 void server_data_callback(socket_wrapper_t session)
 {
-    // Verify the message
-    char echo[13];
-    TEST_EQUAL(buffer_chain_read(session->buffer, echo, strlen(test_phrase)), strlen(test_phrase));
-    TEST_STRING_EQUAL(echo, test_phrase);
+    socket_wrapper_buffer(session);
+    if(session->buffer->length == strlen(test_phrase)) {
+        TEST_STRING_EQUAL(session->buffer->data, test_phrase);
 
-    // Send the message
-    socket_wrapper_write(session, test_phrase, strlen(test_phrase));
+        // Send the message
+        for(size_t i = 0; i < strlen(test_phrase); i++) {
+            socket_wrapper_write(session, &test_phrase[i], 1);
+        }
+    }
 }
 
 void client_close_callback(socket_wrapper_t session)
@@ -64,7 +67,9 @@ int main(void)
         socket_session_start(client, client_data_callback, client_close_callback);
 
         // Send the data
-        socket_session_write(client, test_phrase, strlen(test_phrase));
+        for(size_t i = 0; i < strlen(test_phrase); i++) {
+            socket_wrapper_write(client->socket, &test_phrase[i], 1);
+        }
 
         // Wait for the response
         macrothread_condition_wait(callback_signal);
@@ -84,7 +89,9 @@ int main(void)
         socket_session_start(client, client_data_callback, client_close_callback);
 
         // Send the data
-        socket_session_write(client, test_phrase, strlen(test_phrase));
+        for(size_t i = 0; i < strlen(test_phrase); i++) {
+            socket_wrapper_write(client->socket, &test_phrase[i], 1);
+        }
 
         // Wait for the response
         macrothread_condition_wait(callback_signal);

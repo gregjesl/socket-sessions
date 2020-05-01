@@ -10,99 +10,6 @@
 #include <string.h>
 #include <fcntl.h>
 
-socket_wrapper_t socket_wrapper_init(SOCKET id)
-{
-    socket_wrapper_t result = (socket_wrapper_t)malloc(sizeof(struct socket_wrapper_struct));
-    result->id = id;
-    result->buffer = buffer_chain_init(1024);
-    result->connected = true;
-    result->context = NULL;
-    return result;
-}
-
-int socket_wrapper_read(socket_wrapper_t session)
-{
-    struct pollfd pfd;
-    int pollreturn;
-    char buffer[1024];
-    ssize_t bytes_read;
-    size_t total_bytes_read = 0;
-
-    if(!session->connected) 
-        return SOCKET_SESSION_CLOSED;
-
-    memset(&pfd, 0, sizeof(struct pollfd));
-    pfd.fd = session->id;
-    pfd.events = POLLIN;
-
-    while(poll(&pfd, 1, 0) > 0)
-    {
-        if(pfd.revents & POLLIN) {
-            #ifdef WIN32
-            bytes_read = recv(session->id, buffer, 1024, 0);
-            #else
-            bytes_read = read(session->id, buffer, 1024);
-            #endif
-
-            if(bytes_read > 0) {
-                buffer_chain_write(session->buffer, buffer, bytes_read);
-                total_bytes_read += bytes_read;
-            }
-        }
-
-        if(pfd.revents & POLLHUP) {
-            return SOCKET_SESSION_CLOSED;
-            break;
-        }
-
-        if(pfd.revents & POLLERR) {
-            perror("Poll error");
-        }
-    }
-    
-    return total_bytes_read > 0 ? SOCKET_SESSION_DATA_READ : SOCKET_SESSION_NO_CHANGE;
-}
-
-int socket_wrapper_write(socket_wrapper_t session, const char *data, const size_t length)
-{
-    ssize_t bytes_written = 0;
-    const char *write_index = data;
-    size_t bytes_to_write = length;
-
-    while(bytes_to_write > 0) {
-        #ifdef WIN32
-        bytes_written = send(session->id, write_index, bytes_to_write, 0);
-        #else
-        bytes_written = write(session->id, write_index, bytes_to_write);
-        #endif
-
-        if(bytes_written < 0) {
-            #ifdef WIN32
-            if(bytes_written == WSAETIMEDOUT ||
-                bytes_written == WSAECONNRESET ||
-            ) {
-                return SOCKET_SESSION_CLOSED;
-            } else {
-                return SOCKET_SESSION_ERROR;
-            }
-            #else
-            return bytes_written == EPIPE ? SOCKET_SESSION_CLOSED : SOCKET_SESSION_ERROR;
-            #endif
-        }
-
-        bytes_to_write -= bytes_written;
-        write_index += bytes_written;
-    }
-
-    return length > 0 ? SOCKET_SESSION_DATA_WRITTEN : SOCKET_SESSION_NO_CHANGE;
-}
-
-void socket_wrapper_destroy(socket_wrapper_t session)
-{
-    buffer_chain_destroy(session->buffer);
-    free(session);
-}
-
 socket_session_t socket_session_connect(const char *address, const int port)
 {
     int sock = 0; 
@@ -139,14 +46,9 @@ socket_session_t socket_session_connect(const char *address, const int port)
     return result;
 }
 
-int socket_session_buffer(socket_session_t session)
+int socket_session_write(socket_session_t session, const char *data, const size_t length)
 {
-    return socket_wrapper_read(session->socket);
-}
-
-void socket_session_write(socket_session_t session, const char *data, const size_t length)
-{
-    socket_wrapper_write(session->socket, data, length);
+    return socket_wrapper_write(session->socket, data, length);
 }
 
 void monitor_thread(void *arg)
@@ -160,20 +62,13 @@ void monitor_thread(void *arg)
     while(monitor->monitor) {
         result = poll(&pfd, 1, 10);
         if(result > 0) {
-            if(pfd.revents & POLLIN) {
-                if(socket_wrapper_read(monitor->socket) == SOCKET_SESSION_DATA_READ
-                && monitor->data_ready_callback != NULL) {
-                    monitor->data_ready_callback(monitor->socket);
-                }
+            if(pfd.revents & POLLIN && monitor->data_ready_callback != NULL) {
+                monitor->data_ready_callback(monitor->socket);
             }
 
             if(pfd.revents & POLLHUP) {
-                if(monitor->closure_callback != NULL) {
-                    monitor->closure_callback(monitor->socket);
-                }
-                socket_session_close(monitor);
                 monitor->monitor = false;
-                continue;
+                socket_session_close(monitor);
             }
 
             if(pfd.revents & POLLNVAL) {
@@ -196,6 +91,10 @@ void monitor_thread(void *arg)
 
 void socket_session_start(socket_session_t session, socket_session_callback data_ready, socket_session_callback closure_callback)
 {
+    if(session->thread != NULL) {
+        perror("Socket session already running");
+        return;
+    }
     session->data_ready_callback = data_ready;
     session->closure_callback = closure_callback;
     session->monitor = true;
@@ -264,6 +163,10 @@ void socket_session_close(socket_session_t session)
     #else
     close(session->socket->id);
     #endif
+
+    if(session->closure_callback != NULL) {
+        session->closure_callback(session->socket);
+    }
 
     if(garbage_collector == NULL) {
         garbage_collector = socket_manager_init();
