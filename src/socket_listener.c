@@ -1,37 +1,81 @@
 #include "socket_listener.h"
-#include <netdb.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+
+#ifdef WIN32
+typedef int socklen_t;
+#include <WinSock2.h>
+extern bool winsock_initialized;
+extern WSADATA wsaData;
+#else
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/poll.h>
-#include <stdio.h>
-#include <string.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <fcntl.h>
+#endif // WIN32
 
 void socket_listener_thread(void *arg)
 {
     SOCKET newsockfd;
-    socklen_t clilen;
-    struct sockaddr_in serv_addr, cli_addr;
-    socket_session_t newsession;
-
     socket_listener_t handle = (socket_listener_t)arg;
 
+#ifdef WIN32
+    if (listen(handle->sockfd, handle->queue) != 0) {
+        perror("ERROR on listen");
+        exit(1);
+    }
+#endif // !
     while(!handle->cancellation) {
-        listen(handle->sockfd, handle->queue);
+        
+#ifdef WIN32
+
+#else
+        if (listen(handle->sockfd, handle->queue) != 0) {
+            perror("ERROR on listen");
+            exit(1);
+        }
+#endif // !
+
 
         if(!handle->cancellation) {
-            clilen = sizeof(cli_addr);
    
             /* Accept actual connection from the client */
-            newsockfd = accept(handle->sockfd, (struct sockaddr *)&cli_addr, &clilen);
-                
+            newsockfd = accept(handle->sockfd, NULL, NULL);
+            
+#ifdef WIN32
+            if (newsockfd == INVALID_SOCKET) {
+                switch (WSAGetLastError())
+                {
+                case WSANOTINITIALISED:
+                    perror("WSA Not initalized");
+                    break;
+                case WSAECONNRESET:
+                    perror("Connection reset");
+                    break;
+                case WSAEFAULT:
+                    perror("Invalid address");
+                    break;
+                case WSAEINTR:
+                    perror("Blocking conflict");
+                    break;
+                case WSAEINVAL:
+                    perror("Listen function not called");
+                    break;
+                default:
+                    break;
+                }
+                exit(1);
+            }
+#else
             if (newsockfd < 0) {
                 perror("ERROR on accept");
                 exit(1);
             }
-
+#endif // WIN32
+            
             socket_session_t result = (socket_session_t)malloc(sizeof(struct socket_session_struct));
             result->socket = socket_wrapper_init(newsockfd);
             result->data_ready_callback = NULL;
@@ -40,14 +84,13 @@ void socket_listener_thread(void *arg)
             result->thread = NULL;
 
             // Call the callback
-            handle->connection_callback(result); 
+            handle->connection_callback(result);
         }
     }
 }
 
 socket_listener_t socket_listener_start(int port, int queue, socket_listener_callback callback)
 {
-    int sockfd, portno;
     struct sockaddr_in serv_addr;
 
     // Create the handle
@@ -58,12 +101,7 @@ socket_listener_t socket_listener_start(int port, int queue, socket_listener_cal
     handle->cancellation = false;
    
     /* First call to socket() function */
-    handle->sockfd = socket(AF_INET, SOCK_STREAM, 0);
-
-    if (handle->sockfd < 0) {
-        perror("ERROR opening socket");
-        exit(1);
-    }
+    handle->sockfd = __init_socket();
 
     /* Initialize socket structure */
     memset((char *) &serv_addr, 0, sizeof(serv_addr));

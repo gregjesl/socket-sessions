@@ -7,7 +7,8 @@
 #include "socket_buffer.h"
 
 #ifdef WIN32
-#include <Winsock.h>
+typedef int ssize_t;
+#include <WinSock2.h>
 #else
 #include <unistd.h>
 #include <errno.h>
@@ -25,8 +26,8 @@ typedef struct socket_wrapper_struct
 enum socket_action_result
 {
     SOCKET_ACTION_COMPLETE = 0,
-    SOCKET_CLOSED = -1,
-    SOCKET_ERROR = -2
+    SOCKET_SESSION_CLOSED = -1,
+    SOCKET_SESSION_ERROR = -2
 };
 
 socket_wrapper_t socket_wrapper_init(SOCKET seed);

@@ -1,27 +1,57 @@
 #include "socket_session.h"
 #include "socket_manager.h"
+#include <stdio.h>
+#include <string.h>
+
+#ifdef WIN32
+#include <WinSock2.h>
+#define poll(a,b,c) WSAPoll(a, b, c)
+static bool winsock_initialized = false;
+static WSADATA wsaData = { 0 };
+#else
+#include <sys/types.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/poll.h>
-#include <stdio.h>
-#include <string.h>
 #include <fcntl.h>
+#endif // WIN32
+
+SOCKET __init_socket()
+{
+#ifdef WIN32
+    SOCKET sock = INVALID_SOCKET;
+    if (!winsock_initialized) {
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+            perror("Could not initialize WSA");
+            exit(1);
+        }
+        winsock_initialized = true;
+    }
+    if ((sock = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED)) == INVALID_SOCKET)
+    {
+        perror("Socket creation error");
+    }
+#else
+    SOCKET sock = -1;
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("Socket creation error");
+    }
+#endif // WIN32
+}
 
 socket_session_t socket_session_connect(const char *address, const int port)
 {
-    int sock = 0; 
-    struct sockaddr_in serv_addr; 
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
-    { 
-        perror("Socket creation error"); 
-        return NULL;
-    }
+    SOCKET sock = 0; 
+    struct sockaddr_in serv_addr;
+
    
     serv_addr.sin_family = AF_INET; 
-    serv_addr.sin_port = htons(port); 
+    serv_addr.sin_port = htons(port);
+
+    sock = __init_socket();
        
     // Convert IPv4 and IPv6 addresses from text to binary form 
     if(inet_pton(AF_INET, address, &serv_addr.sin_addr)<=0)  
@@ -159,7 +189,6 @@ void socket_session_close(socket_session_t session)
     static socket_manager_t garbage_collector = NULL;
     #ifdef WIN32
     closesocket(session->socket->id);
-    WSACleanup();
     #else
     close(session->socket->id);
     #endif

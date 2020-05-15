@@ -1,10 +1,16 @@
 #include "socket_wrapper.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+
+#ifdef WIN32
+#define poll(a,b,c) WSAPoll(a, b, c)
+#else
 #include <sys/socket.h>
 #include <sys/poll.h>
-#include <string.h>
 #include <fcntl.h>
+#endif // WIN32
+
 
 socket_wrapper_t socket_wrapper_init(SOCKET id)
 {
@@ -19,12 +25,11 @@ socket_wrapper_t socket_wrapper_init(SOCKET id)
 ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_bytes)
 {
     struct pollfd pfd;
-    int pollreturn;
     ssize_t bytes_read;
     size_t total_bytes_read = 0;
 
     if(!wrapper->connected) 
-        return SOCKET_CLOSED;
+        return SOCKET_SESSION_CLOSED;
 
     memset(&pfd, 0, sizeof(struct pollfd));
     pfd.fd = wrapper->id;
@@ -34,7 +39,7 @@ ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_b
     {
         if(pfd.revents & POLLIN) {
             #ifdef WIN32
-            bytes_read = recv(session->id, buffer + total_bytes_read, max_bytes - total_bytes_read);
+            bytes_read = recv(wrapper->id, buffer + total_bytes_read, max_bytes - total_bytes_read, 0);
             #else
             bytes_read = read(wrapper->id, buffer + total_bytes_read, max_bytes - total_bytes_read);
             #endif
@@ -43,7 +48,7 @@ ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_b
         }
 
         if(pfd.revents & POLLHUP) {
-            return SOCKET_CLOSED;
+            return SOCKET_SESSION_CLOSED;
             break;
         }
 
@@ -90,11 +95,11 @@ int socket_wrapper_write(socket_wrapper_t session, const char *data, const size_
         if(bytes_written < 0) {
             #ifdef WIN32
             if(bytes_written == WSAETIMEDOUT ||
-                bytes_written == WSAECONNRESET ||
+                bytes_written == WSAECONNRESET
             ) {
-                return SOCKET_CLOSED;
+                return SOCKET_SESSION_CLOSED;
             } else {
-                return SOCKET_ERROR;
+                return SOCKET_SESSION_ERROR;
             }
             #else
             return bytes_written == EPIPE ? SOCKET_CLOSED : SOCKET_ERROR;

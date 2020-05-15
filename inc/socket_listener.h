@@ -1,6 +1,13 @@
 #ifndef SOCKET_SESSIONS_SOCKET_LISTENER_H
 #define SOCKET_SESSIONS_SOCKET_LISTENER_H
 
+#ifdef WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN 
+#endif // !WIN32_LEAN_AND_MEAN
+#include <WinSock2.h>
+#endif // WIN32
+
 #include "socket_session.h"
 #include "macrothreading_thread.h"
 

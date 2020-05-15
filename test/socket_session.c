@@ -4,6 +4,8 @@
 #include "macrothreading_condition.h"
 #include "test.h"
 
+#pragma comment(lib, "Ws2_32.lib")
+
 bool cancellation = false;
 int port = 8081;
 macrothread_condition_t callback_signal;

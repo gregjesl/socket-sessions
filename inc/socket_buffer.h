@@ -6,7 +6,9 @@
 
 typedef struct socket_buffer_struct
 {
-    FILE *stream;
+#ifndef WIN32
+    FILE* stream;
+#endif // !WIN32
     char *data;
     size_t length;
 } *socket_buffer_t;
