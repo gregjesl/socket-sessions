@@ -54,7 +54,7 @@ ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_b
 
         if(pfd.revents & POLLERR) {
             perror("Poll error");
-            return SOCKET_ERROR;
+            return SOCKET_SESSION_ERROR;
         }
     }
     
@@ -102,7 +102,7 @@ int socket_wrapper_write(socket_wrapper_t session, const char *data, const size_
                 return SOCKET_SESSION_ERROR;
             }
             #else
-            return bytes_written == EPIPE ? SOCKET_CLOSED : SOCKET_ERROR;
+            return bytes_written == EPIPE ? SOCKET_SESSION_CLOSED : SOCKET_SESSION_ERROR;
             #endif
         }
 

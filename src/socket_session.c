@@ -34,12 +34,13 @@ SOCKET __init_socket()
         perror("Socket creation error");
     }
 #else
-    SOCKET sock = -1;
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0)
     {
         perror("Socket creation error");
     }
 #endif // WIN32
+    return sock;
 }
 
 socket_session_t socket_session_connect(const char *address, const int port)
