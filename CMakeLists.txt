@@ -31,11 +31,11 @@ if(ESP_PLATFORM)
         set(IS_ESP_COMPONENT True)
     endif()
 else()
-    # Include directory
-    include_directories(inc)
-
     # Create the library
     add_library(${PROJECT_NAME} ${sources})
+
+    # Include directory
+    target_include_directories(${PROJECT_NAME} PUBLIC inc)
 
     # Link the library
     if(NOT TARGET macrothreading)
