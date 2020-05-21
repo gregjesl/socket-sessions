@@ -96,6 +96,7 @@ void monitor_thread(void *arg)
             if(pfd.revents & POLLIN && monitor->data_ready_callback != NULL) {
                 monitor->data_ready_callback(monitor->socket);
                 if(monitor->socket->closure_requested) {
+                    shutdown(monitor->socket->id, SHUT_WR);
                     socket_session_close(monitor);
                 }
             }
