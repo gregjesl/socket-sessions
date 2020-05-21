@@ -18,6 +18,7 @@ socket_wrapper_t socket_wrapper_init(SOCKET id)
     result->id = id;
     result->buffer = socket_buffer_init();
     result->connected = true;
+    result->closure_requested = false;
     result->context = NULL;
     return result;
 }

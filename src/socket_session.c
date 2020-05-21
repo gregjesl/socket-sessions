@@ -95,6 +95,9 @@ void monitor_thread(void *arg)
         if(result > 0) {
             if(pfd.revents & POLLIN && monitor->data_ready_callback != NULL) {
                 monitor->data_ready_callback(monitor->socket);
+                if(monitor->socket->closure_requested) {
+                    socket_session_close(monitor);
+                }
             }
 
             if(pfd.revents & POLLHUP) {
