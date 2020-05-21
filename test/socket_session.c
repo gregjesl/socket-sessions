@@ -45,8 +45,9 @@ void server_close_callback(socket_wrapper_t session)
     macrothread_condition_signal(server_close_signal);
 }
 
-void server_connect_callback(socket_session_t session)
+void server_connect_callback(socket_session_t session, void *context)
 {
+    TEST_STRING_EQUAL((char*)context, test_phrase);
     server_session = session;
     socket_session_start(session, server_data_callback, server_close_callback);
 }
@@ -58,7 +59,7 @@ int main(void)
     client_close_signal = macrothread_condition_init();
 
     // Start the listener
-    socket_listener_t listener = socket_listener_start(port, 5, server_connect_callback);
+    socket_listener_t listener = socket_listener_start(port, 5, server_connect_callback, (void*)test_phrase);
 
     {
         // Connect

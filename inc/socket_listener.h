@@ -11,7 +11,7 @@
 #include "socket_session.h"
 #include "macrothreading_thread.h"
 
-typedef void(socket_listener_callback)(socket_session_t);
+typedef void(socket_listener_callback)(socket_session_t, void*);
 
 typedef struct socket_listener_struct
 {
@@ -21,9 +21,10 @@ typedef struct socket_listener_struct
     socket_listener_callback *connection_callback;
     macrothread_handle_t thread;
     bool cancellation;
+    void *context;
 } *socket_listener_t;
 
-socket_listener_t socket_listener_start(int port, int queue, socket_listener_callback callback);
+socket_listener_t socket_listener_start(int port, int queue, socket_listener_callback callback, void *context);
 void socket_listener_stop(socket_listener_t listener);
 
 #endif

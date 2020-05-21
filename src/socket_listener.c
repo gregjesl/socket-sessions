@@ -39,12 +39,10 @@ void socket_listener_thread(void *arg)
         }
 #endif // !
 
+        /* Accept actual connection from the client */
+        newsockfd = accept(handle->sockfd, NULL, NULL);
 
-        if(!handle->cancellation) {
-   
-            /* Accept actual connection from the client */
-            newsockfd = accept(handle->sockfd, NULL, NULL);
-            
+        if(!handle->cancellation) {            
 #ifdef WIN32
             if (newsockfd == INVALID_SOCKET) {
                 switch (WSAGetLastError())
@@ -84,12 +82,18 @@ void socket_listener_thread(void *arg)
             result->thread = NULL;
 
             // Call the callback
-            handle->connection_callback(result);
+            handle->connection_callback(result, handle->context);
+        } else {
+            #ifdef WIN32
+            closesocket(newsockfd);
+            #else
+            close(newsockfd);
+            #endif
         }
     }
 }
 
-socket_listener_t socket_listener_start(int port, int queue, socket_listener_callback callback)
+socket_listener_t socket_listener_start(int port, int queue, socket_listener_callback callback, void *context)
 {
     struct sockaddr_in serv_addr;
 
@@ -99,6 +103,7 @@ socket_listener_t socket_listener_start(int port, int queue, socket_listener_cal
     handle->queue = queue;
     handle->connection_callback = callback;
     handle->cancellation = false;
+    handle->context = context;
    
     /* First call to socket() function */
     handle->sockfd = __init_socket();
@@ -135,12 +140,19 @@ void socket_listener_stop(socket_listener_t listener)
 
     // Connect to the listener
     socket_session_t cancel_session = socket_session_connect("127.0.0.1", listener->port);
+
+    // Close the cancel socket
+    socket_session_close(cancel_session);
     
     // Wait for the thread to join
     macrothread_join(listener->thread);
 
-    // Close the socket
-    socket_session_close(cancel_session);
+    // Close the listener socket
+    #ifdef WIN32
+    closesocket(listener->sockfd);
+    #else
+    close(listener->sockfd);
+    #endif
 
     // Destroy the thread handle
     macrothread_handle_destroy(listener->thread);
