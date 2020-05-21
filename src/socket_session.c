@@ -97,6 +97,11 @@ void monitor_thread(void *arg)
                 monitor->data_ready_callback(monitor->socket);
                 if(monitor->socket->closure_requested) {
                     shutdown(monitor->socket->id, SHUT_WR);
+                    ssize_t recv_result = 0;
+                    do
+                    {
+                        recv_result = recv(monitor->socket->id, NULL, 1, 0);
+                    } while (recv_result > 0);
                     socket_session_close(monitor);
                 }
             }
