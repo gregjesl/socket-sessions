@@ -84,6 +84,13 @@ void socket_listener_thread(void *arg)
             // Call the callback
             handle->connection_callback(result, handle->context);
         } else {
+            // 
+            shutdown(newsockfd, SHUT_WR);
+            ssize_t recv_result = 0;
+            do
+            {
+                recv_result = read(newsockfd, NULL, 1);
+            } while (recv_result > 0);
             #ifdef WIN32
             closesocket(newsockfd);
             #else
@@ -115,6 +122,12 @@ socket_listener_t socket_listener_start(int port, int queue, socket_listener_cal
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(port);
 
+    /* Allow the listening port to be reusable */
+    {
+        int option = 1;
+        setsockopt(handle->sockfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+    }
+
     /* Now bind the host address using bind() call.*/
     if (bind(handle->sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
         perror("ERROR on binding");
@@ -141,8 +154,15 @@ void socket_listener_stop(socket_listener_t listener)
     // Connect to the listener
     socket_session_t cancel_session = socket_session_connect("127.0.0.1", listener->port);
 
-    // Close the cancel socket
-    socket_session_close(cancel_session);
+    // Verify the connection
+    if(cancel_session != NULL) {
+
+        // Wait for acknowledgement
+        read(cancel_session->socket->id, NULL, 1);
+
+        // Close the cancel socket
+        socket_session_close(cancel_session);   
+    }
     
     // Wait for the thread to join
     macrothread_join(listener->thread);
