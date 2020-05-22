@@ -100,9 +100,10 @@ void monitor_thread(void *arg)
                     ssize_t recv_result = 0;
                     do
                     {
-                        recv_result = recv(monitor->socket->id, NULL, 1, 0);
+                        recv_result = read(monitor->socket->id, NULL, 1);
                     } while (recv_result > 0);
                     socket_session_close(monitor);
+                    break;
                 }
             }
 
