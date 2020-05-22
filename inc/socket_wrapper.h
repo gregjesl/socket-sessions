@@ -20,6 +20,7 @@ typedef struct socket_wrapper_struct
     SOCKET id;
     socket_buffer_t buffer;
     bool connected;
+    bool activity_flag;
     bool closure_requested;
     void *context;
 } *socket_wrapper_t;

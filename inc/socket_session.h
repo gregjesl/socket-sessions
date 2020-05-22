@@ -21,7 +21,9 @@ typedef struct socket_session_struct
 {
     socket_wrapper_t socket;
     socket_session_callback *data_ready_callback;
+    socket_session_callback *timeout_callback;
     socket_session_callback *closure_callback;
+    unsigned long int timeout_ms;
     bool monitor;
     macrothread_handle_t thread;
 } *socket_session_t;
@@ -29,6 +31,7 @@ typedef struct socket_session_struct
 SOCKET __init_socket();
 socket_session_t socket_session_connect(const char *address, const int port);
 int socket_session_write(socket_session_t session, const char *data, const size_t length);
+void socket_session_set_timeout(socket_session_t session, unsigned long int timeout_ms, socket_session_callback callback);
 void socket_session_start(socket_session_t session, socket_session_callback data_ready, socket_session_callback closure_callback);
 void socket_session_stop(socket_session_t session);
 void socket_session_close(socket_session_t session);

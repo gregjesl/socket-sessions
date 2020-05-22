@@ -18,6 +18,7 @@ socket_wrapper_t socket_wrapper_init(SOCKET id)
     result->id = id;
     result->buffer = socket_buffer_init();
     result->connected = true;
+    result->activity_flag = false;
     result->closure_requested = false;
     result->context = NULL;
     return result;
@@ -46,6 +47,7 @@ ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_b
             #endif
 
             total_bytes_read += bytes_read;
+            wrapper->activity_flag = true;
         }
 
         if(pfd.revents & POLLHUP) {
@@ -110,6 +112,7 @@ int socket_wrapper_write(socket_wrapper_t session, const char *data, const size_
 
         bytes_to_write -= bytes_written;
         write_index += bytes_written;
+        session->activity_flag = true;
     }
 
     return SOCKET_ACTION_COMPLETE;

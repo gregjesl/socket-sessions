@@ -71,6 +71,8 @@ socket_session_t socket_session_connect(const char *address, const int port)
     socket_session_t result = (socket_session_t)malloc(sizeof(struct socket_session_struct));
     result->socket = socket_wrapper_init(sock);
     result->data_ready_callback = NULL;
+    result->timeout_ms = 0;
+    result->timeout_callback = NULL;
     result->closure_callback = NULL;
     result->monitor = false;
     result->thread = NULL;
@@ -82,8 +84,27 @@ int socket_session_write(socket_session_t session, const char *data, const size_
     return socket_wrapper_write(session->socket, data, length);
 }
 
+void socket_session_set_timeout(socket_session_t session, unsigned long int timeout_ms, socket_session_callback callback)
+{
+    session->timeout_ms = timeout_ms;
+    session->timeout_callback = callback;
+}
+
+void shutdown_session(socket_session_t session)
+{
+    shutdown(session->socket->id, SHUT_WR);
+    ssize_t recv_result = 0;
+    do
+    {
+        recv_result = read(session->socket->id, NULL, 1);
+    } while (recv_result > 0);
+    socket_session_close(session);
+}
+
 void monitor_thread(void *arg)
 {
+    const int poll_period_ms = 10;
+    unsigned long int last_activity = 0;
     struct pollfd pfd;
     int result;
     socket_session_t monitor = (socket_session_t)arg;
@@ -91,18 +112,12 @@ void monitor_thread(void *arg)
     pfd.fd = monitor->socket->id;
     pfd.events = POLLIN;
     while(monitor->monitor) {
-        result = poll(&pfd, 1, 10);
+        result = poll(&pfd, 1, poll_period_ms);
         if(result > 0) {
             if(pfd.revents & POLLIN && monitor->data_ready_callback != NULL) {
                 monitor->data_ready_callback(monitor->socket);
                 if(monitor->socket->closure_requested) {
-                    shutdown(monitor->socket->id, SHUT_WR);
-                    ssize_t recv_result = 0;
-                    do
-                    {
-                        recv_result = read(monitor->socket->id, NULL, 1);
-                    } while (recv_result > 0);
-                    socket_session_close(monitor);
+                    shutdown_session(monitor);
                     break;
                 }
             }
@@ -122,6 +137,18 @@ void monitor_thread(void *arg)
                 monitor->monitor = false;
             }
         } else if(result == 0) {
+            if(monitor->socket->activity_flag) {
+                last_activity = 0;
+                monitor->socket->activity_flag = false;
+            } else {
+                last_activity += poll_period_ms;
+                if(monitor->timeout_ms > 0 && last_activity > monitor->timeout_ms && monitor->timeout_callback != NULL) {
+                    monitor->timeout_callback(monitor->socket);
+                    if(monitor->socket->closure_requested) {
+                        shutdown_session(monitor);
+                    }
+                }
+            }
             continue;
         } else {
             perror("Error encountered");
