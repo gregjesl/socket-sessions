@@ -49,7 +49,8 @@ ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_b
         }
 
         if(pfd.revents & POLLHUP) {
-            return SOCKET_SESSION_CLOSED;
+            wrapper->connected = false;
+            return total_bytes_read > 0 ? total_bytes_read : SOCKET_SESSION_CLOSED;
             break;
         }
 
