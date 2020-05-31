@@ -27,7 +27,7 @@ for:
     - cd ~/esp/esp-idf
     - ./install.sh
     - . $HOME/esp/esp-idf/export.sh
-    - cd ~/projects/macrothreading
+    - cd ~/projects/socket-sessions
 
     after_build:
     - idf.py build
@@ -40,4 +40,4 @@ build_script:
 
 test_script:
   - ps: cd _builds
-  - ctest -VV -C %CONFIGURATION%
+  - ctest -VV -C %CONFIGURATION% --timeout 10
