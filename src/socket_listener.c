@@ -1,4 +1,5 @@
 #include "socket_listener.h"
+#include "macrothreading_condition.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -74,15 +75,14 @@ void socket_listener_thread(void *arg)
             }
 #endif // WIN32
             
-            socket_session_t result = (socket_session_t)malloc(sizeof(struct socket_session_struct));
-            result->socket = socket_wrapper_init(newsockfd);
-            result->data_ready_callback = NULL;
-            result->closure_callback = NULL;
-            result->monitor = false;
-            result->thread = NULL;
+            socket_session_t result = socket_session_init(newsockfd, 1024);
+            result->socket->connected = true;
 
             // Call the callback
             handle->connection_callback(result, handle->context);
+
+            // Start monitoring
+            socket_session_start(result);
         } else {
             // 
             shutdown(newsockfd, SHUT_WR);
@@ -141,6 +141,11 @@ socket_listener_t socket_listener_start(int port, int queue, socket_listener_cal
     return handle;
 }
 
+void cancel_callback(socket_wrapper_t wrapper)
+{
+    macrothread_condition_signal((macrothread_condition_t)wrapper->context);
+}
+
 void socket_listener_stop(socket_listener_t listener)
 {
     if(listener == NULL) {
@@ -151,18 +156,23 @@ void socket_listener_stop(socket_listener_t listener)
     // Set the cancellation flag
     listener->cancellation = true;
 
+    // Create the cancel session
+    socket_session_t cancel_session = socket_session_create(1);
+
+    // Create the condition variable
+    macrothread_condition_t cancel_condition = macrothread_condition_init();
+
+    // Set the context
+    cancel_session->socket->context = (void*)cancel_condition;
+
+    // Set the callback
+    cancel_session->hangup_callback = cancel_callback;
+
     // Connect to the listener
-    socket_session_t cancel_session = socket_session_connect("127.0.0.1", listener->port);
+    socket_session_connect(cancel_session, "127.0.0.1", listener->port);
 
-    // Verify the connection
-    if(cancel_session != NULL) {
-
-        // Wait for acknowledgement
-        read(cancel_session->socket->id, NULL, 1);
-
-        // Close the cancel socket
-        socket_session_close(cancel_session);   
-    }
+    // Wait for shutdown
+    macrothread_condition_wait(cancel_condition);
     
     // Wait for the thread to join
     macrothread_join(listener->thread);

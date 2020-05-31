@@ -9,7 +9,6 @@ typedef struct socket_data_struct
     char *buffer;
     size_t buffer_length;
     size_t max_buffer_length;
-    void *context;
 } *socket_data_t;
 
 socket_data_t socket_data_init(size_t max_buffer_length);

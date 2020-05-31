@@ -1,4 +1,6 @@
 #include "socket_wrapper.h"
+#include "socket_error.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,33 +14,35 @@
 #endif // WIN32
 
 
-socket_wrapper_t socket_wrapper_init(SOCKET id)
+socket_wrapper_t socket_wrapper_init(SOCKET id, size_t max_buffer_length)
 {
     socket_wrapper_t result = (socket_wrapper_t)malloc(sizeof(struct socket_wrapper_struct));
     result->id = id;
-    result->buffer = socket_buffer_init();
+    result->state = 0;
+    result->data = socket_data_init(max_buffer_length);
     result->connected = true;
-    result->activity_flag = false;
-    result->closure_requested = false;
+    result->last_activity = 0;
+    result->timeout = 0.0f;
     result->context = NULL;
     return result;
 }
 
-ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_bytes)
+ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_bytes, int poll_period_ms)
 {
     struct pollfd pfd;
     ssize_t bytes_read;
     size_t total_bytes_read = 0;
 
     if(!wrapper->connected) 
-        return SOCKET_SESSION_CLOSED;
+        return SOCKET_ERROR_CLOSED;
 
     memset(&pfd, 0, sizeof(struct pollfd));
     pfd.fd = wrapper->id;
     pfd.events = POLLIN;
 
-    while(poll(&pfd, 1, 0) > 0 && total_bytes_read < max_bytes)
+    while(poll(&pfd, 1, poll_period_ms) > 0 && total_bytes_read < max_bytes)
     {
+        wrapper->state = pfd.revents;
         if(pfd.revents & POLLIN) {
             #ifdef WIN32
             bytes_read = recv(wrapper->id, buffer + total_bytes_read, max_bytes - total_bytes_read, 0);
@@ -47,40 +51,48 @@ ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_b
             #endif
 
             total_bytes_read += bytes_read;
-            wrapper->activity_flag = true;
+            wrapper->last_activity = 0;
         }
 
-        if(pfd.revents & POLLHUP) {
+        if(pfd.revents & POLLHUP || pfd.revents & POLLNVAL) {
             wrapper->connected = false;
-            return total_bytes_read > 0 ? total_bytes_read : SOCKET_SESSION_CLOSED;
-            break;
+            return total_bytes_read > 0;
         }
 
         if(pfd.revents & POLLERR) {
-            perror("Poll error");
-            return SOCKET_SESSION_ERROR;
+            return SOCKET_ERROR_POLL;
         }
     }
-    
+
+    wrapper->last_activity += poll_period_ms;
     return total_bytes_read;
 }
 
-ssize_t socket_wrapper_buffer(socket_wrapper_t wrapper)
+ssize_t socket_wrapper_buffer(socket_wrapper_t wrapper, int poll_period_ms)
 {
-    const size_t shovel_size = 128;
-    ssize_t result = 0;
-    ssize_t shovel_result;
-    char *shovel = (char*)malloc(shovel_size * sizeof(char));
-    do
-    {
-        shovel_result = socket_wrapper_read(wrapper, shovel, shovel_size);
-        if(shovel_result > 0) {
-            socket_buffer_write(wrapper->buffer, shovel, shovel_result);
-        }
-    } while (shovel_result > 0);
+    if(wrapper->data->buffer_length >= wrapper->data->max_buffer_length) return 0;
+    const size_t buffer_length = wrapper->data->max_buffer_length - wrapper->data->buffer_length;
+    char *buffer = (char*)malloc(buffer_length * sizeof(char));
+    if(buffer == NULL) return SOCKET_ERROR_MALLOC_FAIL;
+    char *write_index = buffer;
+    size_t bytes_written = 0;
+    ssize_t read_result = 0;
 
-    free(shovel);
-    return shovel_result < 0 ? shovel_result : result;
+    while(bytes_written < buffer_length) {
+        assert(buffer_length > bytes_written);
+        read_result = socket_wrapper_read(wrapper, write_index, buffer_length - bytes_written, poll_period_ms);
+        if(read_result <= 0) {
+            break;
+        }
+        bytes_written += read_result;
+        write_index += read_result;
+    }
+    
+    if(bytes_written > 0) {
+        socket_data_push(wrapper->data, buffer, bytes_written);
+    }
+    free(buffer);
+    return read_result < 0 ? read_result : bytes_written;
 }
 
 int socket_wrapper_write(socket_wrapper_t session, const char *data, const size_t length)
@@ -106,20 +118,42 @@ int socket_wrapper_write(socket_wrapper_t session, const char *data, const size_
                 return SOCKET_SESSION_ERROR;
             }
             #else
-            return bytes_written == EPIPE ? SOCKET_SESSION_CLOSED : SOCKET_SESSION_ERROR;
+            return bytes_written == EPIPE ? SOCKET_ERROR_CLOSED : SOCKET_ERROR_WRITE;
             #endif
         }
 
         bytes_to_write -= bytes_written;
         write_index += bytes_written;
-        session->activity_flag = true;
+        session->last_activity = 0;
     }
 
-    return SOCKET_ACTION_COMPLETE;
+    return SOCKET_OK;
+}
+
+int socket_wrapper_close(socket_wrapper_t wrapper)
+{
+    if(wrapper->connected) {
+        shutdown(wrapper->id, SHUT_WR);
+        ssize_t recv_result = 0;
+        do
+        {
+            recv_result = read(wrapper->id, NULL, 1);
+            if(recv_result < 0) {
+                break;
+            }
+        } while (recv_result > 0);
+    }
+    #ifdef WIN32
+    closesocket(wrapper->id);
+    #else
+    close(wrapper->id);
+    #endif
+    wrapper->connected = false;
+    return SOCKET_OK;
 }
 
 void socket_wrapper_destroy(socket_wrapper_t wrapper)
 {
-    socket_buffer_destroy(wrapper->buffer);
+    socket_data_destroy(wrapper->data);
     free(wrapper);
 }

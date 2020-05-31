@@ -8,7 +8,6 @@ socket_data_t socket_data_init(size_t max_buffer_length)
     result->buffer = NULL;
     result->buffer_length = 0;
     result->max_buffer_length = max_buffer_length;
-    result->context = NULL;
     return result;
 }
 
