@@ -2,22 +2,6 @@ cmake_minimum_required (VERSION 3.8)
 
 project(socket-sessions)
 
-# Load macrothreading
-if(NOT TARGET macrothreading)
-    # Check to see if the folder is already cloned
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lib/macrothreading)
-        execute_process(COMMAND git pull origin master
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/macrothreading
-        )
-    else()
-        execute_process(COMMAND git clone https://github.com/gregjesl/macrothreading lib/macrothreading
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        )
-    endif()
-
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/lib/macrothreading")
-endif()
-
 # Get the source files
 file(GLOB sources "src/*.c")
 
@@ -31,6 +15,22 @@ if(ESP_PLATFORM)
         set(IS_ESP_COMPONENT True)
     endif()
 else()
+    # Load macrothreading
+    if(NOT TARGET macrothreading)
+        # Check to see if the folder is already cloned
+        if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lib/macrothreading)
+            execute_process(COMMAND git pull origin master
+                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/macrothreading
+            )
+        else()
+            execute_process(COMMAND git clone https://github.com/gregjesl/macrothreading lib/macrothreading
+                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            )
+        endif()
+
+        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/lib/macrothreading")
+    endif()
+
     # Create the library
     add_library(${PROJECT_NAME} ${sources})
 

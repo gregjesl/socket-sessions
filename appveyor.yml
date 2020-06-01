@@ -28,6 +28,7 @@ for:
     - ./install.sh
     - . $HOME/esp/esp-idf/export.sh
     - cd ~/projects/socket-sessions
+    - git clone https://github.com/gregjesl/macrothreading components/macrothreading
 
     after_build:
     - idf.py build
