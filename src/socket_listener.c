@@ -76,7 +76,7 @@ void socket_listener_thread(void *arg)
 #endif // WIN32
             
             socket_session_t result = socket_session_init(newsockfd, 1024);
-            result->socket->connected = true;
+            result->socket->state = SOCKET_STATE_CONNECTED;
 
             // Call the callback
             handle->connection_callback(result, handle->context);

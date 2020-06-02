@@ -44,56 +44,99 @@ SOCKET __init_socket()
     return sock;
 }
 
+ssize_t __read_cycle(socket_session_t session, int poll_period_ms)
+{
+    // Attempt to write data to the buffer
+    const ssize_t result = socket_wrapper_read(
+        session->socket,
+        session->socket->data->write_buffer,
+        session->socket->data->buffer_length - socket_data_length(session->socket->data),
+        poll_period_ms
+    );
+
+    // Handle new data
+    if(result > 0) {
+
+        // Move the write index
+        session->socket->data->write_buffer += result;
+
+        // Call the data callback
+        if(session->data_callback != NULL) {
+            session->data_callback(session->socket);
+        }
+    }
+
+    return result;
+}
+
+void socket_wrapper_close(socket_wrapper_t wrapper)
+{
+    #ifdef WIN32
+    closesocket(wrapper->id);
+    #else
+    close(wrapper->id);
+    #endif
+    wrapper->state = SOCKET_STATE_CLOSED;
+}
+
 void monitor_thread(void *arg)
 {
     const int poll_period_ms = 10;
-    ssize_t result = 0;
     socket_session_t session = (socket_session_t)arg;
-    while(session->socket->connected) {
-        result = socket_wrapper_buffer(session->socket, poll_period_ms);
-        
-        if(result > 0 && session->data_callback != NULL) {
-            session->data_callback(session->socket);
-        } else if(session->socket->timeout > 0.0f) {
-            const float elapsed = (float)session->socket->last_activity / 1000.0f;
-            if(elapsed > session->socket->timeout) {
-                if(session->timeout_callback != NULL) {
-                    session->timeout_callback(session->socket);
-                }
-                socket_wrapper_close(session->socket);
-                break;
-            }
+
+    do
+    {
+        __read_cycle(session, poll_period_ms);
+
+        // Check for a timeout
+        if(
+            session->socket->timeout > 0.0f
+            &&
+            session->socket->state == SOCKET_STATE_CONNECTED
+            &&
+            (float)session->socket->last_activity / 1000.0f > session->socket->timeout
+        ) {
+            session->socket->state = SOCKET_STATE_TIMEOUT;
         }
 
-        if(session->socket->state & POLLHUP) {
-            do
-            {
-                result = socket_wrapper_buffer(session->socket, 0);
-                if(result > 0 && session->data_callback != NULL) {
-                    session->data_callback(session->socket);
-                }
-            } while (result > 0);
+    } while (session->socket->state == SOCKET_STATE_CONNECTED);
 
-            if(session->hangup_callback != NULL) {
-                session->hangup_callback(session->socket);
-            }
-            socket_wrapper_close(session->socket);
-            break;
+    switch (session->socket->state)
+    {
+    case SOCKET_STATE_CLOSED:
+    case SOCKET_STATE_PEER_CLOSED:
+        while(session->socket->state == SOCKET_STATE_PEER_CLOSED) {
+            __read_cycle(session, 0);
         }
-
-        if(session->socket->state & POLLERR || result < 0) {
-            if(session->error_callback != NULL) {
-                session->error_callback(session->socket);
-            }
-            socket_wrapper_close(session->socket);
-            break;
+        if(session->hangup_callback != NULL) {
+            session->hangup_callback(session->socket);
         }
+        break;
+    case SOCKET_STATE_TIMEOUT:
+        if(session->timeout_callback != NULL) {
+            session->timeout_callback(session->socket);
+        }
+        break;
+    case SOCKET_STATE_SHUTDOWN:
+        // Do nothing
+        break;
+    default:
+    case SOCKET_STATE_ERROR:
+        session->socket->state = SOCKET_STATE_ERROR;
+        if(session->error_callback != NULL) {
+            session->error_callback(session->socket);
+        }
+        break;
     }
+
+    // Close the socket
+    socket_wrapper_close(session->socket);
 
     if(session->finalize_callback != NULL) {
         session->finalize_callback(session->socket);
     }
 
+    // Cleanup
     socket_wrapper_destroy(session->socket);
     free(session);
 }
@@ -137,7 +180,7 @@ int socket_session_connect(socket_session_t session, const char *address, const 
     if(inet_pton(AF_INET, address, &serv_addr.sin_addr)<=0) return SOCKET_ERROR_INVALID_ADDRESS;
    
     if (connect(session->socket->id, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) return SOCKET_ERROR_CONNECT;
-    session->socket->connected = true;
+    session->socket->state = SOCKET_STATE_CONNECTED;
 
     // Start the session
     socket_session_start(session);

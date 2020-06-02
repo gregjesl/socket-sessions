@@ -15,7 +15,7 @@ socket_session_t server_session;
 
 void client_data_callback(socket_wrapper_t session)
 {
-    if(session->data->buffer_length == strlen(test_phrase) + 1) {
+    if(socket_data_length(session->data) == strlen(test_phrase) + 1) {
         TEST_STRING_EQUAL(session->data->buffer, test_phrase);
         macrothread_condition_signal(callback_signal);
     }
@@ -23,7 +23,7 @@ void client_data_callback(socket_wrapper_t session)
 
 void server_data_callback(socket_wrapper_t session)
 {
-    if(session->data->buffer_length == strlen(test_phrase) + 1) {
+    if(socket_data_length(session->data) == strlen(test_phrase) + 1) {
         TEST_STRING_EQUAL(session->data->buffer, test_phrase);
 
         // Send the message
@@ -91,7 +91,7 @@ int main(void)
         macrothread_condition_wait(callback_signal);
 
         // Close the connection
-        socket_wrapper_close(client->socket);
+        socket_wrapper_shutdown(client->socket);
         macrothread_condition_wait(client_finalize_signal);
         macrothread_condition_wait(server_hangup_signal);
         macrothread_condition_wait(server_finalize_signal);
@@ -115,7 +115,7 @@ int main(void)
         macrothread_condition_wait(callback_signal);
 
         // Close the connection
-        socket_wrapper_close(server_session->socket);
+        socket_wrapper_shutdown(server_session->socket);
         macrothread_condition_wait(client_hangup_signal);
         macrothread_condition_wait(client_finalize_signal);
         macrothread_condition_wait(server_finalize_signal);

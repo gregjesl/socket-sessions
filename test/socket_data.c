@@ -8,8 +8,9 @@ int main(void)
     // Create a new data structure
     socket_data_t data = socket_data_init(max_length);
     TEST_NOT_NULL(data);
-    TEST_EQUAL(data->buffer_length, 0);
-    TEST_EQUAL(data->max_buffer_length, max_length);
+    TEST_EQUAL(socket_data_length(data), 0);
+    TEST_EQUAL(data->buffer, data->write_buffer);
+    TEST_EQUAL(data->buffer_length, max_length);
 
     // Test for a null arguement
     const char one = 1;
@@ -27,12 +28,11 @@ int main(void)
     // Verify the data structure
     for(char i = 0; i < max_length; i++) {
         TEST_EQUAL(*data->buffer, i);
-        TEST_EQUAL(data->buffer_length, max_length - i);
+        TEST_EQUAL(socket_data_length(data), max_length - i);
         TEST_EQUAL(socket_data_pop(data, 1), SOCKET_OK);
     }
 
-    TEST_NULL(data->buffer);
-    TEST_EQUAL(data->buffer_length, 0);
+    TEST_EQUAL(socket_data_length(data), 0);
 
     socket_data_destroy(data);
 }
