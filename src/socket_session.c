@@ -66,6 +66,14 @@ void monitor_thread(void *arg)
         }
 
         if(session->socket->state & POLLHUP) {
+            do
+            {
+                result = socket_wrapper_buffer(session->socket, 0);
+                if(result > 0 && session->data_callback != NULL) {
+                    session->data_callback(session->socket);
+                }
+            } while (result > 0);
+
             if(session->hangup_callback != NULL) {
                 session->hangup_callback(session->socket);
             }

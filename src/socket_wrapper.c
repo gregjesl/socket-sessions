@@ -33,9 +33,6 @@ ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_b
     ssize_t bytes_read;
     size_t total_bytes_read = 0;
 
-    if(!wrapper->connected) 
-        return SOCKET_ERROR_CLOSED;
-
     memset(&pfd, 0, sizeof(struct pollfd));
     pfd.fd = wrapper->id;
     pfd.events = POLLIN;
