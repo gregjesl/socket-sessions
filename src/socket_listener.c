@@ -8,6 +8,7 @@ typedef int socklen_t;
 #include <WinSock2.h>
 extern bool winsock_initialized;
 extern WSADATA wsaData;
+#define SHUT_WR SD_SEND
 #else
 #include <sys/types.h>
 #include <sys/socket.h>

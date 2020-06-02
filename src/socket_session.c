@@ -30,7 +30,7 @@ SOCKET __init_socket()
         }
         winsock_initialized = true;
     }
-    if ((sock = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED)) == INVALID_SOCKET)
+    if ((sock = WSASocketW(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED)) == INVALID_SOCKET)
     {
         perror("Socket creation error");
     }

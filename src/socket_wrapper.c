@@ -7,6 +7,7 @@
 
 #ifdef WIN32
 #define poll(a,b,c) WSAPoll(a, b, c)
+#define SHUT_WR SD_SEND
 #else
 #include <sys/socket.h>
 #include <sys/poll.h>
@@ -120,10 +121,10 @@ int socket_wrapper_write(socket_wrapper_t session, const char *data, const size_
                 bytes_written == WSAECONNRESET
             ) {
                 session->state = SOCKET_STATE_PEER_CLOSED;
-                return SOCKET_SESSION_CLOSED;
+                return SOCKET_ERROR_CLOSED;
             } else {
                 session->state = SOCKET_STATE_ERROR;
-                return SOCKET_SESSION_ERROR;
+                return SOCKET_ERROR_WRITE;;
             }
             #else
             if(errno == EPIPE) {
