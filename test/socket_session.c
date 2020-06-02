@@ -4,7 +4,9 @@
 #include "macrothreading_condition.h"
 #include "test.h"
 
+#ifdef WIN32
 #pragma comment(lib, "Ws2_32.lib")
+#endif
 
 bool cancellation = false;
 int port = 8081;
@@ -35,21 +37,25 @@ void server_data_callback(socket_wrapper_t session)
 
 void client_hangup_callback(socket_wrapper_t session)
 {
+    TEST_NOT_NULL(session);
     macrothread_condition_signal(client_hangup_signal);
 }
 
 void server_hangup_callback(socket_wrapper_t session) 
 {
+    TEST_NOT_NULL(session);
     macrothread_condition_signal(server_hangup_signal);
 }
 
 void client_finalize_callback(socket_wrapper_t session)
 {
+    TEST_NOT_NULL(session);
     macrothread_condition_signal(client_finalize_signal);
 }
 
 void server_finalize_callback(socket_wrapper_t session)
 {
+    TEST_NOT_NULL(session);
     macrothread_condition_signal(server_finalize_signal);
 }
 

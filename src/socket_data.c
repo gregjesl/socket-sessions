@@ -17,7 +17,7 @@ size_t socket_data_length(socket_data_t data)
 {
     assert(data != NULL);
     assert(data->write_buffer >= data->buffer);
-    assert(data->write_buffer - data->buffer <= data->buffer_length);
+    assert((size_t)(data->write_buffer - data->buffer) <= data->buffer_length);
     return data->write_buffer - data->buffer;
 }
 

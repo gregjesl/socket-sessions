@@ -18,7 +18,7 @@ int main(void)
     TEST_EQUAL(socket_data_push(data, NULL, 1), SOCKET_ERROR_NULL_ARGUEMENT);
 
     // Populate the data structure
-    for(char i = 0; i < max_length; i++) {
+    for(char i = 0; i < (const char)max_length; i++) {
         TEST_EQUAL(socket_data_push(data, &i, 1), SOCKET_OK);
     }
     
@@ -26,7 +26,7 @@ int main(void)
     TEST_EQUAL(socket_data_push(data, &one, 1), SOCKET_ERROR_BUFFER_OVERFLOW);
 
     // Verify the data structure
-    for(char i = 0; i < max_length; i++) {
+    for(char i = 0; i < (const char)max_length; i++) {
         TEST_EQUAL(*data->buffer, i);
         TEST_EQUAL(socket_data_length(data), max_length - i);
         TEST_EQUAL(socket_data_pop(data, 1), SOCKET_OK);

@@ -4,7 +4,9 @@
 #include "macrothreading_condition.h"
 #include "test.h"
 
+#ifdef WIN32
 #pragma comment(lib, "Ws2_32.lib")
+#endif
 
 #define TEST_BUFFER_LENGTH 16384
 
@@ -23,6 +25,7 @@ void server_data_callback(socket_wrapper_t session)
 
 void server_connect_callback(socket_session_t session, void *context)
 {
+    TEST_NULL(context);
     session->data_callback = server_data_callback;
 }
 

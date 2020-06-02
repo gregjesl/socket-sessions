@@ -4,33 +4,40 @@
 #include "macrothreading_condition.h"
 #include "test.h"
 
+#ifdef WIN32
 #pragma comment(lib, "Ws2_32.lib")
+#endif
 
 int port = 8081;
 macrothread_condition_t server_hangup_signal, client_hangup_signal, server_timeout_signal, client_timeout_signal;
 
 void client_hangup_callback(socket_wrapper_t session)
 {
+    TEST_NOT_NULL(session);
     macrothread_condition_signal(client_hangup_signal);
 }
 
 void server_hangup_callback(socket_wrapper_t session) 
 {
+    TEST_NOT_NULL(session);
     macrothread_condition_signal(server_hangup_signal);
 }
 
 void client_timeout_callback(socket_wrapper_t session)
 {
+    TEST_NOT_NULL(session);
     macrothread_condition_signal(client_timeout_signal);
 }
 
 void server_timeout_callback(socket_wrapper_t session)
 {
+    TEST_NOT_NULL(session);
     macrothread_condition_signal(server_timeout_signal);
 }
 
 void server_connect_callback(socket_session_t session, void *context)
 {
+    TEST_NULL(context);
     session->hangup_callback = server_hangup_callback;
     session->timeout_callback = server_timeout_callback;
     session->socket->timeout = 0.2f;
