@@ -181,7 +181,10 @@ int socket_session_connect(socket_session_t session, const char *address, const 
     // Convert IPv4 and IPv6 addresses from text to binary form 
     if(inet_pton(AF_INET, address, &serv_addr.sin_addr)<=0) return SOCKET_ERROR_INVALID_ADDRESS;
    
-    if (connect(session->socket->id, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) return SOCKET_ERROR_CONNECT;
+    if (connect(session->socket->id, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        perror("Error encountered in connect()");
+        return SOCKET_ERROR_CONNECT;
+    }
     session->socket->state = SOCKET_STATE_CONNECTED;
 
     // Start the session

@@ -102,8 +102,8 @@ ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_b
     return total_bytes_read;
 }
 
-int socket_wrapper_write(socket_wrapper_t session, const char *data, const size_t length)
-{
+int socket_wrapper_write(socket_wrapper_t session, const char *data, size_t length)
+{  
     ssize_t bytes_written = 0;
     const char *write_index = data;
     size_t bytes_to_write = length;

@@ -90,7 +90,11 @@ void socket_listener_thread(void *arg)
             ssize_t recv_result = 0;
             do
             {
-                recv_result = read(newsockfd, NULL, 1);
+                #ifdef WIN32
+                recv(newsockfd, NULL, 1, 0);
+                #else
+                read(newsockfd, NULL, 1);
+                #endif
             } while (recv_result > 0);
             #ifdef WIN32
             closesocket(newsockfd);
