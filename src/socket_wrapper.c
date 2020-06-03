@@ -30,7 +30,7 @@ socket_wrapper_t socket_wrapper_init(SOCKET id, size_t max_buffer_length)
 ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_bytes, int poll_period_ms)
 {
     struct pollfd pfd;
-    ssize_t bytes_read;
+    ssize_t bytes_read = 0;
     size_t total_bytes_read = 0;
 
     memset(&pfd, 0, sizeof(struct pollfd));
@@ -47,7 +47,7 @@ ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_b
     {
         if(pfd.revents & POLLIN) {
             #ifdef WIN32
-            bytes_read = recv(wrapper->id, buffer + total_bytes_read, max_bytes - total_bytes_read, 0);
+            bytes_read = recv(wrapper->id, buffer + total_bytes_read, (int)(max_bytes - total_bytes_read), 0);
             #else
             bytes_read = read(wrapper->id, buffer + total_bytes_read, max_bytes - total_bytes_read);
             #endif
@@ -61,7 +61,7 @@ ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_b
             wrapper->last_activity = 0;
         }
 
-        if(pfd.revents & POLLHUP || pfd.revents & POLLNVAL || bytes_read == 0) {
+        if((pfd.revents & POLLHUP) || (pfd.revents & POLLNVAL) || bytes_read == 0) {
             wrapper->state = (bytes_read > 0) ? SOCKET_STATE_PEER_CLOSED : SOCKET_STATE_CLOSED;
             break;
         }
@@ -74,14 +74,14 @@ ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_b
 
     if(total_bytes_read == max_bytes) {
         wrapper->last_activity += poll_period_ms;
-        return total_bytes_read;
+        return (ssize_t)total_bytes_read;
     }
 
     if(wrapper->state == SOCKET_STATE_PEER_CLOSED) {
         do
         {
             #ifdef WIN32
-            bytes_read = recv(wrapper->id, buffer + total_bytes_read, max_bytes - total_bytes_read, 0);
+            bytes_read = recv(wrapper->id, buffer + total_bytes_read, (int)(max_bytes - total_bytes_read), 0);
             #else
             bytes_read = read(wrapper->id, buffer + total_bytes_read, max_bytes - total_bytes_read);
             #endif
@@ -99,7 +99,7 @@ ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_b
     }
 
     wrapper->last_activity += poll_period_ms;
-    return total_bytes_read;
+    return (ssize_t)total_bytes_read;
 }
 
 int socket_wrapper_write(socket_wrapper_t session, const char *data, size_t length)
@@ -114,7 +114,7 @@ int socket_wrapper_write(socket_wrapper_t session, const char *data, size_t leng
 
     while(bytes_to_write > 0) {
         #ifdef WIN32
-        bytes_written = send(session->id, write_index, bytes_to_write, 0);
+        bytes_written = send(session->id, write_index, (int)bytes_to_write, 0);
         #else
         bytes_written = write(session->id, write_index, bytes_to_write);
         #endif

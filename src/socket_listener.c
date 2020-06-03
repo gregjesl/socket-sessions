@@ -125,11 +125,11 @@ socket_listener_t socket_listener_start(int port, int queue, socket_listener_cal
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(port);
+    serv_addr.sin_port = htons((unsigned short)port);
 
     /* Allow the listening port to be reusable */
     {
-        int option = 1;
+        const char option = 1;
         setsockopt(handle->sockfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
     }
 

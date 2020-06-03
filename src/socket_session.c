@@ -4,9 +4,11 @@
 
 #ifdef WIN32
 #include <WinSock2.h>
+#include <WS2tcpip.h>
 #define poll(a,b,c) WSAPoll(a, b, c)
 static bool winsock_initialized = false;
 static WSADATA wsaData = { 0 };
+#define inet_pton(a, b, c) InetPton(a,b,c)
 #else
 #include <sys/types.h>
 #include <netdb.h>
@@ -176,7 +178,7 @@ int socket_session_connect(socket_session_t session, const char *address, const 
     if(session->thread != NULL) return SOCKET_ERROR_CONFLICT;
 
     serv_addr.sin_family = AF_INET; 
-    serv_addr.sin_port = htons(port);
+    serv_addr.sin_port = htons((unsigned short)port);
        
     // Convert IPv4 and IPv6 addresses from text to binary form 
     if(inet_pton(AF_INET, address, &serv_addr.sin_addr)<=0) return SOCKET_ERROR_INVALID_ADDRESS;

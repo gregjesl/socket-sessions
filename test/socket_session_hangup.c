@@ -12,7 +12,7 @@
 
 int port = 8081;
 macrothread_condition_t callback_signal;
-unsigned int bytes_received = 0;
+size_t bytes_received = 0;
 
 void server_data_callback(socket_wrapper_t session)
 {
