@@ -129,8 +129,8 @@ socket_listener_t socket_listener_start(int port, int queue, socket_listener_cal
 
     /* Allow the listening port to be reusable */
     {
-        const char option = 1;
-        setsockopt(handle->sockfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+        int option = 1;
+        setsockopt(handle->sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&option, sizeof(option));
     }
 
     /* Now bind the host address using bind() call.*/
