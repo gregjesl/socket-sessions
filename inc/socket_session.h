@@ -30,6 +30,7 @@ SOCKET __init_socket();
 socket_session_t socket_session_init(SOCKET id, size_t max_buffer);
 socket_session_t socket_session_create(size_t max_buffer);
 int socket_session_connect(socket_session_t session, const char *address, const int port);
-void socket_session_start(socket_session_t session);
+void socket_session_start(socket_session_t session, bool detach);
+void socket_session_disconnect(socket_session_t session);
 
 #endif

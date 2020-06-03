@@ -47,7 +47,7 @@ int main(void)
     TEST_EQUAL(socket_wrapper_write(client->socket, big_buf, TEST_BUFFER_LENGTH), SOCKET_OK);
 
     // Hangup
-    socket_wrapper_shutdown(client->socket);
+    socket_session_disconnect(client);
 
     // Wait for the response
     macrothread_condition_wait(callback_signal);

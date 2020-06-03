@@ -97,7 +97,7 @@ int main(void)
         macrothread_condition_wait(callback_signal);
 
         // Close the connection
-        socket_wrapper_shutdown(client->socket);
+        socket_session_disconnect(client);
         macrothread_condition_wait(client_finalize_signal);
         macrothread_condition_wait(server_hangup_signal);
         macrothread_condition_wait(server_finalize_signal);
@@ -121,7 +121,7 @@ int main(void)
         macrothread_condition_wait(callback_signal);
 
         // Close the connection
-        socket_wrapper_shutdown(server_session->socket);
+        socket_session_disconnect(server_session);
         macrothread_condition_wait(client_hangup_signal);
         macrothread_condition_wait(client_finalize_signal);
         macrothread_condition_wait(server_finalize_signal);

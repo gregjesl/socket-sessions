@@ -137,8 +137,10 @@ void monitor_thread(void *arg)
     }
 
     // Cleanup
-    socket_wrapper_destroy(session->socket);
-    free(session);
+    if(session->thread->detached) {
+        socket_wrapper_destroy(session->socket);
+        free(session);
+    }
 }
 
 socket_session_t socket_session_init(SOCKET id, size_t max_buffer)
@@ -183,15 +185,26 @@ int socket_session_connect(socket_session_t session, const char *address, const 
     session->socket->state = SOCKET_STATE_CONNECTED;
 
     // Start the session
-    socket_session_start(session);
+    socket_session_start(session, false);
 
     return SOCKET_OK;
 }
 
-void socket_session_start(socket_session_t session)
+void socket_session_start(socket_session_t session, bool detach)
 {
     // Start monitoring the socket
     session->thread = macrothread_handle_init();
-    session->thread->detached = true;
+    session->thread->detached = detach;
     macrothread_start_thread(session->thread, monitor_thread, session);
+}
+
+void socket_session_disconnect(socket_session_t session)
+{
+    socket_wrapper_shutdown(session->socket);
+    if(!session->thread->detached) {
+        macrothread_join(session->thread);
+        macrothread_handle_destroy(session->thread);
+        socket_wrapper_destroy(session->socket);
+        free(session);
+    }
 }

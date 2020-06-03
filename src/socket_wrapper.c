@@ -108,6 +108,10 @@ int socket_wrapper_write(socket_wrapper_t session, const char *data, const size_
     const char *write_index = data;
     size_t bytes_to_write = length;
 
+    if(session->state != SOCKET_STATE_CONNECTED) {
+        return SOCKET_ERROR_CLOSED;
+    }
+
     while(bytes_to_write > 0) {
         #ifdef WIN32
         bytes_written = send(session->id, write_index, bytes_to_write, 0);
@@ -150,9 +154,12 @@ int socket_wrapper_shutdown(socket_wrapper_t wrapper)
     if(wrapper->state == SOCKET_STATE_CLOSED) {
         return SOCKET_ERROR_CLOSED;
     }
-    wrapper->state = SOCKET_STATE_SHUTDOWN;
-    shutdown(wrapper->id, SHUT_WR);
-    return SOCKET_OK;
+    if(wrapper->state == SOCKET_STATE_CONNECTED) {
+        wrapper->state = SOCKET_STATE_SHUTDOWN;
+        shutdown(wrapper->id, SHUT_WR);
+        return SOCKET_OK;
+    }
+    return SOCKET_ERROR_CONFLICT;
 }
 
 void socket_wrapper_destroy(socket_wrapper_t wrapper)
