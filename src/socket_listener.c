@@ -174,6 +174,9 @@ void socket_listener_stop(socket_listener_t listener)
 
     // Wait for shutdown
     macrothread_condition_wait(cancel_condition);
+
+    // Join the canceller
+    socket_session_disconnect(cancel_session);
     
     // Wait for the thread to join
     macrothread_join(listener->thread);
