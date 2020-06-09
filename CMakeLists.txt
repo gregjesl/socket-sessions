@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.11)
 
 project(socket-sessions)
 
@@ -25,18 +25,12 @@ else()
 
     # Load macrothreading
     if(NOT TARGET macrothreading)
-        # Check to see if the folder is already cloned
-        if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lib/macrothreading)
-            execute_process(COMMAND git pull origin master
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/macrothreading
-            )
-        else()
-            execute_process(COMMAND git clone https://github.com/gregjesl/macrothreading lib/macrothreading
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            )
-        endif()
-
-        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/lib/macrothreading")
+        include(FetchContent)
+        FetchContent_Declare(macrothreading_lib
+            GIT_REPOSITORY https://github.com/gregjesl/macrothreading
+        )
+        FetchContent_Populate(macrothreading_lib)
+        add_subdirectory(${macrothreading_lib_SOURCE_DIR})
     endif()
 
     # Create the library
