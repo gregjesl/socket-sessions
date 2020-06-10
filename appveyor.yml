@@ -19,8 +19,8 @@ for:
           configuration: Release
   
     install:
-    - sudo apt-get upgrade
-    - sudo apt-get -y install cmake git wget flex bison gperf python python-pip python-setuptools cmake ninja-build ccache libffi-dev libssl-dev
+    - sudo apt-get update
+    - sudo apt-get -y install wget flex bison gperf python python-pip python-setuptools ninja-build ccache libffi-dev libssl-dev
     - mkdir ~/esp
     - cd ~/esp
     - git clone --recursive https://github.com/espressif/esp-idf.git
