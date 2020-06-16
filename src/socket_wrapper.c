@@ -8,6 +8,7 @@
 #ifdef WIN32
 #define poll(a,b,c) WSAPoll(a, b, c)
 #define SHUT_WR SD_SEND
+#pragma comment(lib, "Ws2_32.lib")
 #else
 #include <sys/socket.h>
 #include <sys/poll.h>
