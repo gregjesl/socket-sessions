@@ -1,6 +1,7 @@
 #include "socket_session.h"
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #ifdef WIN32
 #include <WinSock2.h>
@@ -81,6 +82,12 @@ void socket_wrapper_close(socket_wrapper_t wrapper)
     wrapper->state = SOCKET_STATE_CLOSED;
 }
 
+void socket_wrapper_destroy(socket_wrapper_t wrapper)
+{
+    socket_data_destroy(wrapper->data);
+    free(wrapper);
+}
+
 void monitor_thread(void *arg)
 {
     const int poll_period_ms = 10;
@@ -133,16 +140,19 @@ void monitor_thread(void *arg)
 
     // Close the socket
     socket_wrapper_close(session->socket);
+    assert(session->socket->state == SOCKET_STATE_CLOSED);
 
+    // Notify 
     if(session->finalize_callback != NULL) {
         session->finalize_callback(session->socket);
+    } else {
+        macrothread_condition_signal(session->socket->finalized);
     }
 
-    // Cleanup
-    if(session->thread->detached) {
-        socket_wrapper_destroy(session->socket);
-        free(session);
-    }
+    // Wait for the signal to shut down
+    macrothread_condition_wait(session->socket->finalized);
+    socket_wrapper_destroy(session->socket);
+    free(session);
 }
 
 socket_session_t socket_session_init(SOCKET id, size_t max_buffer)
@@ -201,26 +211,20 @@ int socket_session_connect(socket_session_t session, const char *address, const 
     session->socket->state = SOCKET_STATE_CONNECTED;
 
     // Start the session
-    socket_session_start(session, false);
+    socket_session_start(session);
 
     return SOCKET_OK;
 }
 
-void socket_session_start(socket_session_t session, bool detach)
+void socket_session_start(socket_session_t session)
 {
     // Start monitoring the socket
     session->thread = macrothread_handle_init();
-    session->thread->detached = detach;
+    session->thread->detached = true;
     macrothread_start_thread(session->thread, monitor_thread, session);
 }
 
 void socket_session_disconnect(socket_session_t session)
 {
     socket_wrapper_shutdown(session->socket);
-    if(!session->thread->detached) {
-        macrothread_join(session->thread);
-        macrothread_handle_destroy(session->thread);
-        socket_wrapper_destroy(session->socket);
-        free(session);
-    }
 }

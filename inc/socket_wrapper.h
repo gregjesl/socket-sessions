@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include "socket_data.h"
+#include "macrothreading_condition.h"
 
 #ifdef WIN32
 typedef int ssize_t;
@@ -35,6 +36,7 @@ typedef struct socket_wrapper_struct
     socket_state_t state;
     unsigned long last_activity;
     float timeout;
+    macrothread_condition_t finalized;
     void *context;
 } *socket_wrapper_t;
 
@@ -42,6 +44,6 @@ socket_wrapper_t socket_wrapper_init(SOCKET seed, size_t max_buffer_length);
 ssize_t socket_wrapper_read(socket_wrapper_t wrapper, char *buffer, size_t max_bytes, int poll_period_ms);
 int socket_wrapper_write(socket_wrapper_t wrapper, const char *buffer, size_t length);
 int socket_wrapper_shutdown(socket_wrapper_t wrapper);
-void socket_wrapper_destroy(socket_wrapper_t wrapper);
+void socket_wrapper_finalize(socket_wrapper_t wrapper);
 
 #endif

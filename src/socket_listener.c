@@ -83,7 +83,7 @@ void socket_listener_thread(void *arg)
             handle->connection_callback(result, handle->context);
 
             // Start monitoring
-            socket_session_start(result, true);
+            socket_session_start(result);
         } else {
             // 
             shutdown(newsockfd, SHUT_WR);

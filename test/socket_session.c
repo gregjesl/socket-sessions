@@ -50,12 +50,14 @@ void server_hangup_callback(socket_wrapper_t session)
 void client_finalize_callback(socket_wrapper_t session)
 {
     TEST_NOT_NULL(session);
+    socket_wrapper_finalize(session);
     macrothread_condition_signal(client_finalize_signal);
 }
 
 void server_finalize_callback(socket_wrapper_t session)
 {
     TEST_NOT_NULL(session);
+    socket_wrapper_finalize(session);
     macrothread_condition_signal(server_finalize_signal);
 }
 
