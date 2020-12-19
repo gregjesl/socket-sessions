@@ -176,14 +176,11 @@ void socket_listener_stop(socket_listener_t listener)
     // Connect to the listener
     socket_session_connect(cancel_session, "127.0.0.1", listener->port);
 
-    // Wait for shutdown
-    macrothread_condition_wait(cancel_condition);
-
     // Join the canceller
     socket_session_disconnect(cancel_session);
-    
-    // Wait for the thread to join
-    macrothread_join(listener->thread);
+
+    // Wait for shutdown
+    macrothread_condition_wait(cancel_condition);
 
     // Close the listener socket
     #ifdef WIN32
