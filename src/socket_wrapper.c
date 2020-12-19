@@ -21,7 +21,6 @@ socket_wrapper_t socket_wrapper_init(SOCKET id, size_t max_buffer_length)
     socket_wrapper_t result = (socket_wrapper_t)malloc(sizeof(struct socket_wrapper_struct));
     result->id = id;
     result->state = SOCKET_STATE_CLOSED;
-    result->finalized = macrothread_condition_init();
     result->data = socket_data_init(max_buffer_length);
     result->last_activity = 0;
     result->timeout = 0.0f;
@@ -162,9 +161,4 @@ int socket_wrapper_shutdown(socket_wrapper_t wrapper)
         return SOCKET_OK;
     }
     return SOCKET_ERROR_CONFLICT;
-}
-
-void socket_wrapper_finalize(socket_wrapper_t wrapper)
-{
-    macrothread_condition_signal(wrapper->finalized);
 }

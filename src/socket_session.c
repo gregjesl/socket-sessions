@@ -145,12 +145,9 @@ void monitor_thread(void *arg)
     // Notify 
     if(session->finalize_callback != NULL) {
         session->finalize_callback(session->socket);
-    } else {
-        macrothread_condition_signal(session->socket->finalized);
     }
 
     // Wait for the signal to shut down
-    macrothread_condition_wait(session->socket->finalized);
     socket_wrapper_destroy(session->socket);
     free(session);
 }

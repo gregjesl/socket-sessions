@@ -171,7 +171,7 @@ void socket_listener_stop(socket_listener_t listener)
     cancel_session->socket->context = (void*)cancel_condition;
 
     // Set the callback
-    cancel_session->hangup_callback = cancel_callback;
+    cancel_session->finalize_callback = cancel_callback;
 
     // Connect to the listener
     socket_session_connect(cancel_session, "127.0.0.1", listener->port);
