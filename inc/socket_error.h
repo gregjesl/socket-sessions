@@ -1,5 +1,5 @@
-#ifndef BIRCHRIDGE_SOCKET_ERROR_H
-#define BIRCHRIDGE_SOCKET_ERROR_H
+#ifndef SOCKET_SESSION_ERROR_H
+#define SOCKET_SESSION_ERROR_H
 
 enum socket_error_enum
 {

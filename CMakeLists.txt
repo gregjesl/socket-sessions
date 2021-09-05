@@ -30,7 +30,7 @@ else()
             GIT_REPOSITORY https://github.com/gregjesl/macrothreading
         )
         FetchContent_Populate(macrothreading_lib)
-        add_subdirectory(${macrothreading_lib_SOURCE_DIR})
+        add_subdirectory(${macrothreading_lib_SOURCE_DIR} build)
     endif()
 
     # Create the library
@@ -48,6 +48,6 @@ else()
     # Check for top-level project
     if(${PROJECT_NAME} STREQUAL ${CMAKE_PROJECT_NAME})
         enable_testing()
-        add_subdirectory(test)
+        # add_subdirectory(test)
     endif()
 endif()

@@ -4,7 +4,6 @@
 #include <assert.h>
 
 #ifdef WIN32
-#include <WinSock2.h>
 #include <WS2tcpip.h>
 #define poll(a,b,c) WSAPoll(a, b, c)
 static bool winsock_initialized = false;
@@ -15,6 +14,16 @@ static WSADATA wsaData = { 0 };
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/poll.h>
+#include <fcntl.h>
+#endif // WIN32
+
+#ifdef WIN32
+#define poll(a,b,c) WSAPoll(a, b, c)
+#define SHUT_WR SD_SEND
+#pragma comment(lib, "Ws2_32.lib")
+#else
 #include <sys/socket.h>
 #include <sys/poll.h>
 #include <fcntl.h>
@@ -47,47 +56,7 @@ SOCKET __init_socket()
     return sock;
 }
 
-ssize_t __read_cycle(socket_session_t session, int poll_period_ms)
-{
-    // Attempt to write data to the buffer
-    const ssize_t result = socket_wrapper_read(
-        session->socket,
-        session->socket->data->write_buffer,
-        session->socket->data->buffer_length - socket_data_length(session->socket->data),
-        poll_period_ms
-    );
-
-    // Handle new data
-    if(result > 0) {
-
-        // Move the write index
-        session->socket->data->write_buffer += result;
-
-        // Call the data callback
-        if(session->data_callback != NULL) {
-            session->data_callback(session->socket);
-        }
-    }
-
-    return result;
-}
-
-void socket_wrapper_close(socket_wrapper_t wrapper)
-{
-    #ifdef WIN32
-    closesocket(wrapper->id);
-    #else
-    close(wrapper->id);
-    #endif
-    wrapper->state = SOCKET_STATE_CLOSED;
-}
-
-void socket_wrapper_destroy(socket_wrapper_t wrapper)
-{
-    socket_data_destroy(wrapper->data);
-    free(wrapper);
-}
-
+/*
 void monitor_thread(void *arg)
 {
     const int poll_period_ms = 10;
@@ -151,29 +120,35 @@ void monitor_thread(void *arg)
     socket_wrapper_destroy(session->socket);
     free(session);
 }
+*/
 
-socket_session_t socket_session_init(SOCKET id, size_t max_buffer)
+socket_session_t socket_session_init(SOCKET id)
 {
+	// Create the structure
     socket_session_t result = (socket_session_t)malloc(sizeof(struct socket_session_struct));
-    result->thread = NULL;
-    
-    // Initialize the socket
-    result->socket = socket_wrapper_init(id, max_buffer);
 
-    // Set all the callbacks
-    result->data_callback = NULL;
-    result->hangup_callback = NULL;
-    result->timeout_callback = NULL;
-    result->error_callback = NULL;
-    result->finalize_callback = NULL;
+	// Set the socket ID
+	result->id = id;
+
+	// Set the thread to null
+	result->thread = NULL;
+
+	// Initialize the mutex
+	result->mutex = macrothread_mutex_init();
+
+	// Initialize the condition
+	result->condition = macrothread_condition_init();
+
+	// Set the state
+	result->state = SOCKET_STATE_CLOSED;
 
     // Return the result
     return result;
 }
 
-socket_session_t socket_session_create(size_t max_buffer)
+socket_session_t socket_session_create()
 {
-    return socket_session_init(__init_socket(), max_buffer);
+    return socket_session_init(__init_socket());
 }
 
 int socket_session_connect(socket_session_t session, const char *address, const int port)
@@ -181,21 +156,21 @@ int socket_session_connect(socket_session_t session, const char *address, const 
     struct sockaddr_in serv_addr;
 
     // Validate the inputs
-    if(session == NULL || address == NULL) return SOCKET_ERROR_NULL_ARGUEMENT;
-    if(session->thread != NULL) return SOCKET_ERROR_CONFLICT;
+    if(session == NULL || address == NULL) return -1;
+    if(session->thread != NULL) return -1;
 
     serv_addr.sin_family = AF_INET; 
     serv_addr.sin_port = htons((unsigned short)port);
        
     // Convert IPv4 and IPv6 addresses from text to binary form 
-    if(inet_pton(AF_INET, address, &serv_addr.sin_addr)<=0) return SOCKET_ERROR_INVALID_ADDRESS;
+    if(inet_pton(AF_INET, address, &serv_addr.sin_addr)<=0) return -1;
    
     unsigned int retry_count = 0;
     while(retry_count < 3) {
-        if (connect(session->socket->id, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        if (connect(session->id, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
             if(retry_count > 2) {
                 perror("Error encountered in connect()");
-                return SOCKET_ERROR_CONNECT;
+                return -1;
             } else {
                 retry_count++;
                 macrothread_delay(10);
@@ -205,14 +180,12 @@ int socket_session_connect(socket_session_t session, const char *address, const 
         }
     }
 
-    session->socket->state = SOCKET_STATE_CONNECTED;
+    session->state = SOCKET_STATE_CONNECTED;
 
-    // Start the session
-    socket_session_start(session);
-
-    return SOCKET_OK;
+    return 0;
 }
 
+/*
 void socket_session_start(socket_session_t session)
 {
     // Start monitoring the socket
@@ -220,8 +193,136 @@ void socket_session_start(socket_session_t session)
     session->thread->detached = true;
     macrothread_start_thread(session->thread, monitor_thread, session);
 }
+*/
+
+size_t socket_session_read(socket_session_t session, char *buffer, size_t max_bytes)
+{
+	struct pollfd pfd;
+	size_t bytes_read = 0;
+	size_t total_bytes_read = 0;
+
+	memset(&pfd, 0, sizeof(struct pollfd));
+	pfd.fd = session->id;
+	pfd.events = POLLIN;
+
+	while (
+		(session->state == SOCKET_STATE_CONNECTED || session->state == SOCKET_STATE_PEER_CLOSED)
+		&&
+		total_bytes_read < max_bytes
+		&&
+		poll(&pfd, 1, 0) > 0
+		)
+	{
+		if (pfd.revents & POLLIN) {
+#ifdef WIN32
+			bytes_read = recv(session->id, buffer + total_bytes_read, (int)(max_bytes - total_bytes_read), 0);
+#else
+			bytes_read = read(wrapper->id, buffer + total_bytes_read, max_bytes - total_bytes_read);
+#endif
+
+			if (bytes_read < 0) {
+				session->state = SOCKET_STATE_ERROR;
+				goto exit;
+			}
+
+			total_bytes_read += bytes_read;
+		}
+
+		if ((pfd.revents & POLLHUP) || (pfd.revents & POLLNVAL) || bytes_read == 0) {
+			session->state = (bytes_read > 0) ? SOCKET_STATE_PEER_CLOSED : SOCKET_STATE_CLOSED;
+			break;
+		}
+
+		if (pfd.revents & POLLERR) {
+			session->state = SOCKET_STATE_ERROR;
+			goto exit;
+		}
+	}
+	
+	exit:
+	return total_bytes_read;
+}
+
+size_t socket_session_write(socket_session_t session, const char *buffer, size_t length)
+{
+	size_t bytes_written = 0;
+	const char *write_index = buffer;
+	size_t bytes_to_write = length;
+
+	if (session->state != SOCKET_STATE_CONNECTED) {
+		;
+	}
+
+	while (bytes_to_write > 0) {
+#ifdef WIN32
+		bytes_written = send(session->id, write_index, (int)bytes_to_write, 0);
+#else
+		bytes_written = write(session->id, write_index, bytes_to_write);
+#endif
+
+		if (bytes_written < 0) {
+#ifdef WIN32
+			if (bytes_written == WSAETIMEDOUT ||
+				bytes_written == WSAECONNRESET
+				) {
+				session->state = SOCKET_STATE_PEER_CLOSED;
+				goto exit;
+			}
+			else {
+				session->state = SOCKET_STATE_ERROR;
+				goto exit;
+			}
+#else
+			if (errno == EPIPE) {
+				session->state = SOCKET_STATE_PEER_CLOSED;
+				return SOCKET_ERROR_CLOSED;
+			}
+			else {
+				session->state = SOCKET_STATE_ERROR;
+				return SOCKET_ERROR_WRITE;
+			}
+#endif
+		}
+
+		bytes_to_write -= bytes_written;
+		write_index += bytes_written;
+	}
+
+	exit:
+	return bytes_written;
+}
+
+/*
+size_t socket_session_buffer(socket_session_t session, size_t min_bytes, size_t max_bytes)
+{
+// TODO
+	(void)session;
+	(void)min_bytes;
+	(void)max_bytes;
+	return 0;
+}
+
+size_t socket_session_flush(socket_session_t session, size_t bytes_to_flush)
+{
+// TODO
+	return 0;
+}
+*/
+
+void socket_session_shutdown(socket_session_t session)
+{
+	if (session->state == SOCKET_STATE_CONNECTED || session->state == SOCKET_STATE_PEER_CLOSED) {
+		session->state = SOCKET_STATE_SHUTDOWN;
+		shutdown(session->id, SHUT_WR);
+	}
+}
 
 void socket_session_disconnect(socket_session_t session)
 {
-    socket_wrapper_shutdown(session->socket);
+#ifdef WIN32
+	closesocket(session->id);
+#else
+	close(session->id);
+#endif
+	session->state = SOCKET_STATE_CLOSED;
 }

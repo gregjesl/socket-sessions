@@ -76,18 +76,18 @@ void socket_listener_thread(void *arg)
             }
 #endif // WIN32
             
-            socket_session_t result = socket_session_init(newsockfd, 1024);
-            result->socket->state = SOCKET_STATE_CONNECTED;
+            socket_session_t result = socket_session_init(newsockfd);
+            result->state = SOCKET_STATE_CONNECTED;
 
             // Call the callback
             handle->connection_callback(result, handle->context);
 
             // Start monitoring
-            socket_session_start(result);
+            // socket_session_start(result);
         } else {
             // 
             shutdown(newsockfd, SHUT_WR);
-            ssize_t recv_result = 0;
+            size_t recv_result = 0;
             do
             {
                 #ifdef WIN32
@@ -146,11 +146,6 @@ socket_listener_t socket_listener_start(int port, int queue, socket_listener_cal
     return handle;
 }
 
-void cancel_callback(socket_wrapper_t wrapper)
-{
-    macrothread_condition_signal((macrothread_condition_t)wrapper->context);
-}
-
 void socket_listener_stop(socket_listener_t listener)
 {
     if(listener == NULL) {
@@ -166,12 +161,6 @@ void socket_listener_stop(socket_listener_t listener)
 
     // Create the condition variable
     macrothread_condition_t cancel_condition = macrothread_condition_init();
-
-    // Set the context
-    cancel_session->socket->context = (void*)cancel_condition;
-
-    // Set the callback
-    cancel_session->finalize_callback = cancel_callback;
 
     // Connect to the listener
     socket_session_connect(cancel_session, "127.0.0.1", listener->port);
