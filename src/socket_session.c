@@ -10,6 +10,7 @@ static bool winsock_initialized = false;
 static WSADATA wsaData = { 0 };
 #define inet_pton(a, b, c) InetPton(a,b,c)
 #define SHUT_WR SD_SEND
+typedef int ssize_t;
 #pragma comment(lib, "Ws2_32.lib")
 #else
 #include <sys/types.h>
@@ -196,7 +197,7 @@ void socket_session_start(socket_session_t session)
 size_t socket_session_read(socket_session_t session, char *buffer, size_t max_bytes)
 {
 	struct pollfd pfd;
-	size_t bytes_read = 0;
+	ssize_t bytes_read = 0;
 	size_t total_bytes_read = 0;
 
 	memset(&pfd, 0, sizeof(struct pollfd));
@@ -243,12 +244,12 @@ size_t socket_session_read(socket_session_t session, char *buffer, size_t max_by
 
 size_t socket_session_write(socket_session_t session, const char *buffer, size_t length)
 {
-	size_t bytes_written = 0;
+	ssize_t bytes_written = 0;
 	const char *write_index = buffer;
 	size_t bytes_to_write = length;
 
 	if (session->state != SOCKET_STATE_CONNECTED) {
-		;
+		goto exit;
 	}
 
 	while (bytes_to_write > 0) {
