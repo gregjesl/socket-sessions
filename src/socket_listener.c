@@ -81,9 +81,6 @@ void socket_listener_thread(void *arg)
 
             // Call the callback
             handle->connection_callback(result, handle->context);
-
-            // Start monitoring
-            // socket_session_start(result);
         } else {
             // 
             shutdown(newsockfd, SHUT_WR);
@@ -101,6 +98,7 @@ void socket_listener_thread(void *arg)
             #else
             close(newsockfd);
             #endif
+            macrothread_condition_signal(handle->shutdown_signal);
         }
     }
 }
@@ -160,7 +158,7 @@ void socket_listener_stop(socket_listener_t listener)
     socket_session_t cancel_session = socket_session_create(1);
 
     // Create the condition variable
-    macrothread_condition_t cancel_condition = macrothread_condition_init();
+    listener->shutdown_signal = macrothread_condition_init();
 
     // Connect to the listener
     socket_session_connect(cancel_session, "127.0.0.1", listener->port);
@@ -169,7 +167,7 @@ void socket_listener_stop(socket_listener_t listener)
     socket_session_disconnect(cancel_session);
 
     // Wait for shutdown
-    macrothread_condition_wait(cancel_condition);
+    macrothread_condition_wait(listener->shutdown_signal);
 
     // Close the listener socket
     #ifdef WIN32

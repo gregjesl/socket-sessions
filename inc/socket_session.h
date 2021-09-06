@@ -6,6 +6,8 @@
 #define WIN32_LEAN_AND_MEAN 
 #endif // !WIN32_LEAN_AND_MEAN
 #include <WinSock2.h>
+#else
+typedef int SOCKET;
 #endif // WIN32
 
 #include "macrothreading_thread.h"
@@ -33,6 +35,7 @@ typedef struct socket_session_struct
 	macrothread_condition_t condition;
 	socket_session_state_t state;
 	char *buffer;
+	size_t buffer_len;
 } *socket_session_t;
 
 SOCKET __init_socket();
@@ -43,12 +46,14 @@ This funciton is used when a socket already exists and a session needs to be bui
 */
 socket_session_t socket_session_init(SOCKET id);
 socket_session_t socket_session_create();
-int socket_session_connect(socket_session_t session, const char *address, const int port);
+socket_session_state_t socket_session_connect(socket_session_t session, const char *address, const int port);
 size_t socket_session_read(socket_session_t session, char *buffer, size_t max_bytes);
 size_t socket_session_write(socket_session_t session, const char *buffer, size_t bytes_to_write);
-// size_t socket_session_buffer(socket_session_t session, size_t min_bytes, size_t max_bytes);
-// size_t socket_session_flush(socket_session_t session, size_t bytes_to_flush);
+socket_session_state_t socket_session_wait(socket_session_t session);
+size_t socket_session_buffer(socket_session_t session, size_t min_bytes, size_t max_bytes);
+size_t socket_session_flush(socket_session_t session, size_t bytes_to_flush);
 void socket_session_shutdown(socket_session_t session);
 void socket_session_disconnect(socket_session_t session);
+void socket_session_destroy(socket_session_t session);
 
 #endif

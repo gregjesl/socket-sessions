@@ -48,6 +48,6 @@ else()
     # Check for top-level project
     if(${PROJECT_NAME} STREQUAL ${CMAKE_PROJECT_NAME})
         enable_testing()
-        # add_subdirectory(test)
+        add_subdirectory(test)
     endif()
 endif()
