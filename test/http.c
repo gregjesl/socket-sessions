@@ -1,6 +1,10 @@
 #include "socket_session.h"
+#ifdef WIN32
+#pragma comment(lib, "Ws2_32.lib")
+#else
 #include <netdb.h>
 #include <arpa/inet.h>
+#endif
 #include "test.h"
 
 #define GET_REQUEST "GET / HTTP/1.0\r\n\r\n"
