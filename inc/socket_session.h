@@ -51,6 +51,8 @@ size_t socket_session_read(socket_session_t session, char *buffer, size_t max_by
 size_t socket_session_write(socket_session_t session, const char *buffer, size_t bytes_to_write);
 socket_session_state_t socket_session_wait(socket_session_t session);
 size_t socket_session_buffer(socket_session_t session, size_t min_bytes, size_t max_bytes);
+typedef bool(socket_buffer_condition)(const char *, size_t);
+bool socket_session_buffer_until(socket_session_t session, socket_buffer_condition condition, size_t increment, size_t max_bytes);
 size_t socket_session_flush(socket_session_t session, size_t bytes_to_flush);
 void socket_session_shutdown(socket_session_t session);
 void socket_session_disconnect(socket_session_t session);

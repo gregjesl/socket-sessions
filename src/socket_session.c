@@ -367,6 +367,38 @@ size_t socket_session_buffer(socket_session_t session, size_t min_bytes, size_t 
     return session->buffer_len;
 }
 
+bool socket_session_buffer_until(socket_session_t session, socket_buffer_condition condition, size_t increment, size_t max_bytes)
+{
+    // Check for valid inputs
+    if(session == NULL || max_bytes == 0) return 0;
+
+    // Seed the initial buffer if needed
+    if(session->buffer == NULL || session->buffer_len == 0) {
+        const size_t bytes_read = socket_session_buffer(session, increment, max_bytes);
+        if(bytes_read < increment) return bytes_read;
+    }
+
+    // At this point, the buffer should be populated with at least increment bytes
+    assert(session->buffer != NULL);
+    assert(session->buffer_len >= increment);
+
+    // Check for a passing initial condition
+    while(!condition(session->buffer, session->buffer_len) && session->buffer_len < max_bytes) {
+        // Determine the minimum number of bytes, which should be less than or equal to the maximum number of bytes
+        const size_t min_bytes = session->buffer_len + increment > max_bytes ? max_bytes : session->buffer_len + increment;
+
+        // Buffer the bytes
+        const size_t bytes_read = socket_session_buffer(session, min_bytes, max_bytes);
+        
+        // Check for an error
+        if(bytes_read < min_bytes) {
+            return bytes_read;
+        }
+    }
+
+    return condition(session->buffer, session->buffer_len);
+}
+
 size_t socket_session_flush(socket_session_t session, size_t bytes_to_flush)
 {
     if(bytes_to_flush < session->buffer_len) 

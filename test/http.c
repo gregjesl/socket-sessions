@@ -1,10 +1,15 @@
 #include "socket_session.h"
-#include "macrothreading_condition.h"
 #include <netdb.h>
-#include<arpa/inet.h>
+#include <arpa/inet.h>
 #include "test.h"
 
 #define GET_REQUEST "GET / HTTP/1.0\r\n\r\n"
+
+bool condition(const char *buffer, size_t len)
+{
+    const char *needle = strstr(buffer, "\r\n\r\n");
+    return needle != NULL && needle >= buffer && needle < buffer + len;
+}
 
 int main(void)
 {
@@ -30,10 +35,7 @@ int main(void)
     TEST_EQUAL(socket_session_write(client, GET_REQUEST, strlen(GET_REQUEST)), strlen(GET_REQUEST));
 
     // Get the response
-    do
-    {
-        socket_session_buffer(client, client->buffer_len + 1, client->buffer_len + 1024);
-    } while (strstr(client->buffer, "\r\n\r\n") == NULL);
+    TEST_TRUE(socket_session_buffer_until(client, condition, 4, 4096));
 
     // Shut down the socket
     socket_session_disconnect(client);
