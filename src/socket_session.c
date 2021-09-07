@@ -27,26 +27,39 @@ typedef int ssize_t;
 
 #define SESSION_RECEIVE_CAPABLE(session) (session->state == SOCKET_STATE_CONNECTED || session->state == SOCKET_STATE_PEER_CLOSED || session->state == SOCKET_STATE_SHUTDOWN)
 
+#ifdef WIN32
+void winsock_init()
+{
+	if (!winsock_initialized) {
+		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != NO_ERROR) {
+			perror("Could not initialize WSA");
+			exit(1);
+		}
+		winsock_initialized = true;
+	}
+}
+#endif
+
 SOCKET __init_socket()
 {
 #ifdef WIN32
+	winsock_init();
     SOCKET sock = INVALID_SOCKET;
-    if (!winsock_initialized) {
-        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-            perror("Could not initialize WSA");
-            exit(1);
-        }
-        winsock_initialized = true;
-    }
-    if ((sock = WSASocketW(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED)) == INVALID_SOCKET)
+    if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET)
     {
         perror("Socket creation error");
+#ifdef WIN32
+		const int error = WSAGetLastError();
+		printf("%i\n", error);
+#endif // WIN32
+		exit(1);
     }
 #else
     SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0)
     {
         perror("Socket creation error");
+		exit(1);
     }
 #endif // WIN32
     return sock;
@@ -149,6 +162,49 @@ socket_session_t socket_session_init(SOCKET id)
 socket_session_t socket_session_create()
 {
     return socket_session_init(__init_socket());
+}
+
+int resolve_ipv4_host(const char *host, const int port, char *ip_address)
+{
+	// Resolve the IP address
+#ifdef WIN32
+	struct addrinfo hints;
+	struct addrinfo *result = NULL;
+	struct sockaddr_in  *sockaddr_ipv4;
+	char port_str[10];
+
+	// Verify winsock is intiated
+	winsock_init();
+
+	// Set the hints
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+
+	// Convert the port to a string
+	sprintf(port_str, "%i", port);
+
+	const int err = getaddrinfo(host, port_str, &hints, &result);
+	if (err != 0) {
+		return err;
+	}
+	sockaddr_ipv4 = (struct sockaddr_in *) result->ai_addr;
+	inet_ntop(AF_INET, sockaddr_ipv4, ip_address, 16);
+#else
+	struct hostent *server_host = NULL;
+	struct in_addr **addr_list = NULL;
+	server_host = gethostbyname(host);
+	if (server_host == NULL) {
+		return -1
+	}
+	addr_list = (struct in_addr **) server_host->h_addr_list;
+	if (addr_list[0] == NULL) {
+		return -1
+	}
+	strcpy(ip_address, inet_ntoa(*addr_list[0]));
+#endif
+	return 0;
 }
 
 socket_session_state_t socket_session_connect(socket_session_t session, const char *address, const int port)
@@ -312,12 +368,16 @@ socket_session_state_t socket_session_wait(socket_session_t session)
         macrothread_delay(1);
     }
 
-    if (pfd.revents & POLLIN) {
-		if (pfd.revents & POLLERR) {
-			session->state = SOCKET_STATE_ERROR;
-		} else if ((pfd.revents & POLLHUP) || (pfd.revents & POLLNVAL)) {
-			session->state = SOCKET_STATE_PEER_CLOSED;
-		}
+    if(pfd.revents & POLLERR) {
+        session->state = SOCKET_STATE_ERROR;
+        return session->state;
+    } else if(pfd.revents & POLLHUP) {
+        session->state = SOCKET_STATE_PEER_CLOSED;
+        return session->state;
+    } else if(pfd.revents & POLLNVAL) {
+        session->state = SOCKET_STATE_ERROR;
+        return session->state;
+    } else if(pfd.revents & POLLIN) {
         return session->state;
     } else {
         goto restart;

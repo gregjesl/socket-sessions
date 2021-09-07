@@ -1,6 +1,7 @@
 #include "socket_session.h"
 #ifdef WIN32
 #pragma comment(lib, "Ws2_32.lib")
+#include <ws2tcpip.h>
 #else
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -24,13 +25,13 @@ int main(void)
     struct addrinfo hints;
     struct addrinfo *result = NULL;
     struct sockaddr_in  *sockaddr_ipv4;
+	winsock_init();
     ZeroMemory( &hints, sizeof(hints) );
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
     TEST_EQUAL(getaddrinfo("example.com", "80", &hints, &result), 0);
     sockaddr_ipv4 = (struct sockaddr_in *) result->ai_addr;
-    strcpy(ip, inet_ntoa(sockaddr_ipv4->sin_addr));
+	inet_ntop(AF_INET, sockaddr_ipv4, ip, 100);
     #else
     struct hostent *server_host = NULL;
     struct in_addr **addr_list = NULL;
