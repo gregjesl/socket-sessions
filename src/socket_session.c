@@ -164,6 +164,7 @@ socket_session_t socket_session_create()
     return socket_session_init(__init_socket());
 }
 
+/*
 int resolve_ipv4_host(const char *host, const int port, char *ip_address)
 {
 	// Resolve the IP address
@@ -196,16 +197,17 @@ int resolve_ipv4_host(const char *host, const int port, char *ip_address)
 	struct in_addr **addr_list = NULL;
 	server_host = gethostbyname(host);
 	if (server_host == NULL) {
-		return -1
+		return -1;
 	}
 	addr_list = (struct in_addr **) server_host->h_addr_list;
 	if (addr_list[0] == NULL) {
-		return -1
+		return -1;
 	}
 	strcpy(ip_address, inet_ntoa(*addr_list[0]));
 #endif
 	return 0;
 }
+*/
 
 socket_session_state_t socket_session_connect(socket_session_t session, const char *address, const int port)
 {
