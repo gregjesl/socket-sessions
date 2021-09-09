@@ -1,6 +1,7 @@
 #include "socket_session.h"
 #ifdef WIN32
 #pragma comment(lib, "Ws2_32.lib")
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <ws2tcpip.h>
 #else
 #include <netdb.h>
@@ -18,20 +19,37 @@ bool condition(const char *buffer, size_t len)
 
 int main(void)
 {
-    char ip[100];
+    char ip[NI_MAXHOST];
     
     // Resolve the IP address
     #ifdef WIN32
-    struct addrinfo hints;
-    struct addrinfo *result = NULL;
-    struct sockaddr_in  *sockaddr_ipv4;
-	winsock_init();
-    ZeroMemory( &hints, sizeof(hints) );
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    TEST_EQUAL(getaddrinfo("example.com", "80", &hints, &result), 0);
-    sockaddr_ipv4 = (struct sockaddr_in *) result->ai_addr;
-	inet_ntop(AF_INET, sockaddr_ipv4, ip, 100);
+    winsock_init();
+    int                  errno;
+    struct addrinfo      hints;  //prefered addr type(connection)
+    struct addrinfo  *   list = NULL;   //list of addr structs
+    struct addrinfo  *   addrptr = NULL;//the one i am gonna use
+
+    char *servname = "example.com";
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_flags                = 0;
+    hints.ai_family               = AF_INET;
+    hints.ai_socktype             = SOCK_RAW;
+    hints.ai_protocol             = IPPROTO_ICMP;
+
+    if ((errno = getaddrinfo(servname, 0, &hints, &list))<0){
+        fprintf(stderr, "addrinfo error, lookup fail:  %s", gai_strerror(errno));
+        exit(1);
+    }
+
+    addrptr = list;
+
+    if (addrptr != NULL) {
+        getnameinfo(addrptr->ai_addr, addrptr->ai_addrlen, ip, sizeof(ip), NULL, 0, NI_NUMERICHOST);
+        printf("%s can be reached at %s\n", servname, ip);
+    }
+
+    freeaddrinfo(list);
     #else
     struct hostent *server_host = NULL;
     struct in_addr **addr_list = NULL;
