@@ -55,10 +55,12 @@ int main(void)
         TEST_EQUAL(client->state, SOCKET_STATE_SHUTDOWN);
 
         // Verify shutdown
+        #ifndef unix
         do
         {
             socket_session_wait(server_session);
         } while (server_session->state != SOCKET_STATE_PEER_CLOSED);
+        #endif
 
         // Read the rest of the buffer
         socket_session_flush(server_session, server_session->buffer_len);
@@ -105,10 +107,12 @@ int main(void)
         TEST_EQUAL(server_session->state, SOCKET_STATE_SHUTDOWN);
 
         // Verify shutdown
+        #ifndef unix
         do
         {
             socket_session_wait(client);
         } while (client->state != SOCKET_STATE_PEER_CLOSED);
+        #endif
 
         // Read the rest of the buffer
         socket_session_flush(client, client->buffer_len);

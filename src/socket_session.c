@@ -370,7 +370,6 @@ socket_session_state_t socket_session_wait(socket_session_t session)
         macrothread_delay(1);
     }
 
-    #ifdef WIN32
     if(pfd.revents & POLLERR) {
         session->state = SOCKET_STATE_ERROR;
         return session->state;
@@ -385,18 +384,6 @@ socket_session_state_t socket_session_wait(socket_session_t session)
     } else {
         goto restart;
     }
-    #else
-    if (pfd.revents & POLLIN) {
-		if (pfd.revents & POLLERR) {
-			session->state = SOCKET_STATE_ERROR;
-		} else if ((pfd.revents & POLLHUP) || (pfd.revents & POLLNVAL)) {
-			session->state = SOCKET_STATE_PEER_CLOSED;
-		}
-        return session->state;
-    } else {
-        goto restart;
-    }
-    #endif
 }
 
 void __resize_buffer(socket_session_t session, size_t size)
