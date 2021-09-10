@@ -84,13 +84,13 @@ void socket_listener_thread(void *arg)
         } else {
             // 
             shutdown(newsockfd, SHUT_WR);
-            size_t recv_result = 0;
+            int recv_result = 0;
             do
             {
                 #ifdef WIN32
-                recv(newsockfd, NULL, 1, 0);
+                recv_result = recv(newsockfd, NULL, 1, 0);
                 #else
-                read(newsockfd, NULL, 1);
+                recv_result = read(newsockfd, NULL, 1);
                 #endif
             } while (recv_result > 0);
             #ifdef WIN32
