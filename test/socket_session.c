@@ -63,9 +63,9 @@ int main(void)
         #endif
 
         // Read the rest of the buffer
-        socket_session_flush(server_session, server_session->buffer_len);
+        TEST_EQUAL(socket_session_flush(server_session, server_session->buffer_len), 0);
         TEST_EQUAL(server_session->buffer_len, 0);
-        socket_session_buffer(server_session, strlen(test_phrase) + 1, strlen(test_phrase) + 1);
+        TEST_EQUAL(socket_session_buffer(server_session, strlen(test_phrase) + 1, strlen(test_phrase) + 1),strlen(test_phrase) + 1);
         TEST_STRING_EQUAL(test_phrase, server_session->buffer);
 
         // Verify closure
@@ -115,9 +115,9 @@ int main(void)
         #endif
 
         // Read the rest of the buffer
-        socket_session_flush(client, client->buffer_len);
+        TEST_EQUAL(socket_session_flush(client, client->buffer_len), 0);
         TEST_EQUAL(client->buffer_len, 0);
-        socket_session_buffer(client, strlen(test_phrase) + 1, strlen(test_phrase) + 1);
+        TEST_EQUAL(socket_session_buffer(client, strlen(test_phrase) + 1, strlen(test_phrase) + 1), strlen(test_phrase) + 1);
         TEST_STRING_EQUAL(test_phrase, client->buffer);
 
         // Verify closure
