@@ -98,6 +98,7 @@ void socket_listener_thread(void *arg)
             #else
             close(newsockfd);
             #endif
+            macrothread_condition_wait(handle->shutdown_signal);
             macrothread_condition_signal(handle->shutdown_signal);
         }
     }
@@ -166,8 +167,14 @@ void socket_listener_stop(socket_listener_t listener)
     // Join the canceller
     socket_session_disconnect(cancel_session);
 
+    // Signal to proceed with shutdown
+    macrothread_condition_signal(listener->shutdown_signal);
+
     // Wait for shutdown
     macrothread_condition_wait(listener->shutdown_signal);
+
+    // Free the signal
+    macrothread_condition_destroy(listener->shutdown_signal);
 
     // Close the listener socket
     #ifdef WIN32
