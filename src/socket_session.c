@@ -42,12 +42,12 @@ void winsock_init()
 
 SOCKET __init_socket()
 {
+    SOCKET sock = INVALID_SOCKET;
 #ifdef WIN32
 	winsock_init();
-    SOCKET sock = INVALID_SOCKET;
-    if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET)
+    sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 #else
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
+    sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0)
     {
         sock = INVALID_SOCKET;
