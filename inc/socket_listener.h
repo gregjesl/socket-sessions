@@ -16,6 +16,8 @@ typedef struct socket_listener_struct
     bool cancellation;
     macrothread_condition_t shutdown_signal;
     void *context;
+    bool error;
+    bool started;
 } *socket_listener_t;
 
 socket_listener_t socket_listener_start(int port, int queue, socket_listener_callback callback, void *context);

@@ -46,20 +46,11 @@ SOCKET __init_socket()
 	winsock_init();
     SOCKET sock = INVALID_SOCKET;
     if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET)
-    {
-        perror("Socket creation error");
-#ifdef WIN32
-		const int error = WSAGetLastError();
-		printf("%i\n", error);
-#endif // WIN32
-		exit(1);
-    }
 #else
     SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0)
     {
-        perror("Socket creation error");
-		exit(1);
+        sock = INVALID_SOCKET;
     }
 #endif // WIN32
     return sock;
@@ -161,7 +152,8 @@ socket_session_t socket_session_init(SOCKET id)
 
 socket_session_t socket_session_create()
 {
-    return socket_session_init(__init_socket());
+    SOCKET sock = __init_socket();
+    return sock == INVALID_SOCKET ? NULL : socket_session_init(sock);
 }
 
 size_t socket_session_resolve_ipv4(const char *fqdn, socket_session_ipv4_address result, size_t skip)

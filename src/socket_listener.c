@@ -26,18 +26,16 @@ void socket_listener_thread(void *arg)
 
 #ifdef WIN32
     if (listen(handle->sockfd, handle->queue) != 0) {
-        perror("ERROR on listen");
-        exit(1);
+        handle->error = true;
+        return;
     }
 #endif // !
     while(!handle->cancellation) {
         
-#ifdef WIN32
-
-#else
+#ifndef WIN32
         if (listen(handle->sockfd, handle->queue) != 0) {
-            perror("ERROR on listen");
-            exit(1);
+            handle->error = true;
+            return;
         }
 #endif // !
 
@@ -67,12 +65,13 @@ void socket_listener_thread(void *arg)
                 default:
                     break;
                 }
-                exit(1);
+                handle->error = true;
+                return;
             }
 #else
             if (newsockfd < 0) {
-                perror("ERROR on accept");
-                exit(1);
+                handle->error = true;
+                return;
             }
 #endif // WIN32
             
@@ -98,8 +97,6 @@ void socket_listener_thread(void *arg)
             #else
             close(newsockfd);
             #endif
-            macrothread_condition_wait(handle->shutdown_signal);
-            macrothread_condition_signal(handle->shutdown_signal);
         }
     }
 }
@@ -113,11 +110,18 @@ socket_listener_t socket_listener_start(int port, int queue, socket_listener_cal
     handle->port = port;
     handle->queue = queue;
     handle->connection_callback = callback;
+    handle->thread = NULL;
     handle->cancellation = false;
     handle->context = context;
+    handle->error = false;
+    handle->started = false;
    
     /* First call to socket() function */
     handle->sockfd = __init_socket();
+    if(handle->sockfd == INVALID_SOCKET) {
+        handle->error = true;
+        return handle;
+    }
 
     /* Initialize socket structure */
     memset((char *) &serv_addr, 0, sizeof(serv_addr));
@@ -134,13 +138,14 @@ socket_listener_t socket_listener_start(int port, int queue, socket_listener_cal
 
     /* Now bind the host address using bind() call.*/
     if (bind(handle->sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-        perror("ERROR on binding");
-        exit(1);
+        handle->error = true;
+        return handle;
     }
 
     // Start the thread
     handle->thread = macrothread_handle_init();
     macrothread_start_thread(handle->thread, socket_listener_thread, handle);
+    handle->started = true;
         
     return handle;
 }
@@ -152,39 +157,42 @@ void socket_listener_stop(socket_listener_t listener)
         return;
     }
 
-    // Set the cancellation flag
-    listener->cancellation = true;
+    if(!listener->error && listener->started) {
 
-    // Create the cancel session
-    socket_session_t cancel_session = socket_session_create(1);
+        // Set the cancellation flag
+        listener->cancellation = true;
 
-    // Create the condition variable
-    listener->shutdown_signal = macrothread_condition_init();
+        // Create the cancel session
+        socket_session_t cancel_session = socket_session_create();
 
-    // Connect to the listener
-    socket_session_connect(cancel_session, "127.0.0.1", listener->port);
+        // Create the condition variable
+        listener->shutdown_signal = macrothread_condition_init();
 
-    // Join the canceller
-    socket_session_disconnect(cancel_session);
+        // Connect to the listener
+        socket_session_connect(cancel_session, "127.0.0.1", listener->port);
 
-    // Signal to proceed with shutdown
-    macrothread_condition_signal(listener->shutdown_signal);
+        // Join the canceller
+        socket_session_disconnect(cancel_session);
 
-    // Wait for shutdown
-    macrothread_condition_wait(listener->shutdown_signal);
+    }
 
-    // Free the signal
-    macrothread_condition_destroy(listener->shutdown_signal);
+    if(listener->started) {
+        macrothread_join(listener->thread);
+    }
 
     // Close the listener socket
-    #ifdef WIN32
-    closesocket(listener->sockfd);
-    #else
-    close(listener->sockfd);
-    #endif
+    if(listener->sockfd != INVALID_SOCKET) {
+        #ifdef WIN32
+        closesocket(listener->sockfd);
+        #else
+        close(listener->sockfd);
+        #endif
+    }
 
     // Destroy the thread handle
-    macrothread_handle_destroy(listener->thread);
+    if(listener->thread != NULL) {
+        macrothread_handle_destroy(listener->thread);
+    }
 
     // Destroy the listener
     free(listener);

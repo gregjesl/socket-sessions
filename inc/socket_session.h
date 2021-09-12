@@ -9,6 +9,7 @@
 void winsock_init();
 #else
 typedef int SOCKET;
+#define INVALID_SOCKET -1
 #endif // WIN32
 
 #include "macrothreading_thread.h"
