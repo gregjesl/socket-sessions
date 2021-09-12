@@ -102,7 +102,6 @@ size_t socket_session_resolve_ipv4(const char *fqdn, socket_session_ipv4_address
     #endif
 
     memset(result, 0, sizeof(socket_session_ipv4_address));
-
     memset(&hints, 0, sizeof(hints));
     hints.ai_flags                = 0;
     hints.ai_family               = AF_INET;
@@ -111,11 +110,6 @@ size_t socket_session_resolve_ipv4(const char *fqdn, socket_session_ipv4_address
 
     if (getaddrinfo(fqdn, 0, &hints, &list) < 0) {
         return 0;
-    }
-
-    // Pull the first entry
-    if (list != NULL) {
-        
     }
 
     for(ptr=list; ptr != NULL; ptr=ptr->ai_next) {
