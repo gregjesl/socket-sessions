@@ -19,46 +19,10 @@ bool condition(const char *buffer, size_t len)
 
 int main(void)
 {
-    char ip[NI_MAXHOST];
+    socket_session_ipv4_address ip;
     
     // Resolve the IP address
-    #ifdef WIN32
-    winsock_init();
-    int                  errno;
-    struct addrinfo      hints;  //prefered addr type(connection)
-    struct addrinfo  *   list = NULL;   //list of addr structs
-    struct addrinfo  *   addrptr = NULL;//the one i am gonna use
-
-    char *servname = "example.com";
-
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_flags                = 0;
-    hints.ai_family               = AF_INET;
-    hints.ai_socktype             = SOCK_RAW;
-    hints.ai_protocol             = IPPROTO_ICMP;
-
-    if ((errno = getaddrinfo(servname, 0, &hints, &list))<0){
-        fprintf(stderr, "addrinfo error, lookup fail:  %s", gai_strerror(errno));
-        exit(1);
-    }
-
-    addrptr = list;
-
-    if (addrptr != NULL) {
-        getnameinfo(addrptr->ai_addr, addrptr->ai_addrlen, ip, sizeof(ip), NULL, 0, NI_NUMERICHOST);
-        printf("%s can be reached at %s\n", servname, ip);
-    }
-
-    freeaddrinfo(list);
-    #else
-    struct hostent *server_host = NULL;
-    struct in_addr **addr_list = NULL;
-    server_host = gethostbyname("example.com");
-    TEST_NOT_NULL(server_host);
-    addr_list = (struct in_addr **) server_host->h_addr_list;
-    TEST_NOT_NULL(addr_list[0]);
-    strcpy(ip , inet_ntoa(*addr_list[0]));
-    #endif
+    TEST_TRUE(socket_session_resolve_ipv4("example.com", ip, 0) > 0);
 
     // Create the client
     socket_session_t client = socket_session_create();

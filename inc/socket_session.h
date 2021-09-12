@@ -39,6 +39,8 @@ typedef struct socket_session_struct
 	size_t buffer_len;
 } *socket_session_t;
 
+typedef char socket_session_ipv4_address[16];
+
 SOCKET __init_socket();
 /* \brief Creates a session from an existing socket 
 This funciton is used when a socket already exists and a session needs to be built for the socket
@@ -47,8 +49,8 @@ This funciton is used when a socket already exists and a session needs to be bui
 */
 socket_session_t socket_session_init(SOCKET id);
 socket_session_t socket_session_create();
-// int resolve_ipv4_host(const char *host, const int port, char *result);
-socket_session_state_t socket_session_connect(socket_session_t session, const char *address, const int port);
+size_t socket_session_resolve_ipv4(const char *fqdn, socket_session_ipv4_address result, size_t skip);
+socket_session_state_t socket_session_connect(socket_session_t session, const socket_session_ipv4_address, const int port);
 size_t socket_session_read(socket_session_t session, char *buffer, size_t max_bytes);
 size_t socket_session_write(socket_session_t session, const char *buffer, size_t bytes_to_write);
 socket_session_state_t socket_session_wait(socket_session_t session);

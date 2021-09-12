@@ -164,50 +164,44 @@ socket_session_t socket_session_create()
     return socket_session_init(__init_socket());
 }
 
-/*
-int resolve_ipv4_host(const char *host, const int port, char *ip_address)
+size_t socket_session_resolve_ipv4(const char *fqdn, socket_session_ipv4_address result, size_t skip)
 {
-	// Resolve the IP address
-#ifdef WIN32
-	struct addrinfo hints;
-	struct addrinfo *result = NULL;
-	struct sockaddr_in  *sockaddr_ipv4;
-	char port_str[10];
+    size_t num_results = 0;
+    struct addrinfo      hints;  //prefered addr type(connection)
+    struct addrinfo  *   list = NULL;   //list of addr structs
+    struct addrinfo  *   ptr = NULL;   // Iterator
 
-	// Verify winsock is intiated
-	winsock_init();
+    #ifdef WIN32
+    winsock_init();
+    #endif
 
-	// Set the hints
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
+    memset(result, 0, sizeof(socket_session_ipv4_address));
 
-	// Convert the port to a string
-	sprintf(port_str, "%i", port);
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_flags                = 0;
+    hints.ai_family               = AF_INET;
+    hints.ai_socktype             = SOCK_RAW;
+    hints.ai_protocol             = IPPROTO_ICMP;
 
-	const int err = getaddrinfo(host, port_str, &hints, &result);
-	if (err != 0) {
-		return err;
-	}
-	sockaddr_ipv4 = (struct sockaddr_in *) result->ai_addr;
-	inet_ntop(AF_INET, sockaddr_ipv4, ip_address, 16);
-#else
-	struct hostent *server_host = NULL;
-	struct in_addr **addr_list = NULL;
-	server_host = gethostbyname(host);
-	if (server_host == NULL) {
-		return -1;
-	}
-	addr_list = (struct in_addr **) server_host->h_addr_list;
-	if (addr_list[0] == NULL) {
-		return -1;
-	}
-	strcpy(ip_address, inet_ntoa(*addr_list[0]));
-#endif
-	return 0;
+    if (getaddrinfo(fqdn, 0, &hints, &list) < 0) {
+        return 0;
+    }
+
+    // Pull the first entry
+    if (list != NULL) {
+        
+    }
+
+    for(ptr=list; ptr != NULL; ptr=ptr->ai_next) {
+        if(num_results == skip) {
+            getnameinfo(ptr->ai_addr, ptr->ai_addrlen, result, sizeof(socket_session_ipv4_address), NULL, 0, NI_NUMERICHOST);
+        }
+        num_results++;
+    }
+
+    freeaddrinfo(list);
+    return num_results;
 }
-*/
 
 socket_session_state_t socket_session_connect(socket_session_t session, const char *address, const int port)
 {
