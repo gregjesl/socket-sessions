@@ -1,0 +1,6 @@
+[submodule "wolfssl"]
+	path = wolfssl
+	url = https://github.com/wolfSSL/wolfssl
+[submodule "macrothreading"]
+	path = macrothreading
+	url = https://github.com/gregjesl/macrothreading

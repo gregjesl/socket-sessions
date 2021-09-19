@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.11)
+cmake_minimum_required (VERSION 3.8)
 
 project(socket-sessions)
 
@@ -24,14 +24,10 @@ else()
     endif()
 
     # Load macrothreading
-    if(NOT TARGET macrothreading)
-        include(FetchContent)
-        FetchContent_Declare(macrothreading_lib
-            GIT_REPOSITORY https://github.com/gregjesl/macrothreading
-        )
-        FetchContent_Populate(macrothreading_lib)
-        add_subdirectory(${macrothreading_lib_SOURCE_DIR} build)
-    endif()
+    add_subdirectory(macrothreading)
+
+    # Load wolfSSL
+    add_subdirectory(wolfSSL)
 
     # Create the library
     add_library(${PROJECT_NAME} ${sources})
@@ -43,7 +39,7 @@ else()
     if(NOT TARGET macrothreading)
         message(FATAL_ERROR "No macrothreading library found")
     endif()
-    target_link_libraries (${PROJECT_NAME} PUBLIC macrothreading)
+    target_link_libraries (${PROJECT_NAME} PUBLIC macrothreading wolfssl)
 
     # Check for top-level project
     if(${PROJECT_NAME} STREQUAL ${CMAKE_PROJECT_NAME})
