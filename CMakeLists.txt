@@ -29,6 +29,8 @@ else()
     # Load wolfSSL
     add_subdirectory(wolfSSL)
 
+    add_definitions(-DWC_NO_HARDEN)
+
     # Create the library
     add_library(${PROJECT_NAME} ${sources})
 
