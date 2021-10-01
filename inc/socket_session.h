@@ -20,6 +20,8 @@ typedef int SOCKET;
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include "wolfssl/ssl.h"
+
 typedef enum socket_session_state_enum
 {
 	SOCKET_STATE_CLOSED,
@@ -28,6 +30,12 @@ typedef enum socket_session_state_enum
 	SOCKET_STATE_SHUTDOWN,
 	SOCKET_STATE_ERROR
 } socket_session_state_t;
+
+typedef struct socket_session_tls_struct
+{
+	WOLFSSL* ssl;
+	WOLFSSL_CTX* ctx;
+} *socket_session_tls_t;
 
 typedef struct socket_session_struct
 {
@@ -38,6 +46,7 @@ typedef struct socket_session_struct
 	socket_session_state_t state;
 	char *buffer;
 	size_t buffer_len;
+	socket_session_tls_t tls;
 } *socket_session_t;
 
 typedef char socket_session_ipv4_address[16];
@@ -51,6 +60,8 @@ This funciton is used when a socket already exists and a session needs to be bui
 socket_session_t socket_session_init(SOCKET id);
 socket_session_t socket_session_create();
 size_t socket_session_resolve_ipv4(const char *fqdn, socket_session_ipv4_address result, size_t skip);
+void socket_session_enable_tls_client(socket_session_t session, const char *ca_cert);
+bool socket_session_tls_enabled(socket_session_t session);
 socket_session_state_t socket_session_connect(socket_session_t session, const socket_session_ipv4_address, const int port);
 size_t socket_session_read(socket_session_t session, char *buffer, size_t max_bytes);
 size_t socket_session_write(socket_session_t session, const char *buffer, size_t bytes_to_write);
@@ -62,5 +73,6 @@ size_t socket_session_flush(socket_session_t session, size_t bytes_to_flush);
 void socket_session_shutdown(socket_session_t session);
 void socket_session_disconnect(socket_session_t session);
 void socket_session_destroy(socket_session_t session);
+void socket_session_cleanup();
 
 #endif

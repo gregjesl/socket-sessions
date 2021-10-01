@@ -80,6 +80,9 @@ socket_session_t socket_session_init(SOCKET id)
     result->buffer = NULL;
     result->buffer_len = 0;
 
+    // The session does not use TLS by default
+    result->tls = NULL;
+
     // Return the result
     return result;
 }
@@ -141,6 +144,7 @@ socket_session_state_t socket_session_connect(socket_session_t session, const ch
         if (connect(session->id, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
             if(retry_count > 2) {
                 perror("Error encountered in connect()");
+                session->state = SOCKET_STATE_ERROR;
                 return SOCKET_STATE_ERROR;
             } else {
                 retry_count++;
@@ -151,25 +155,37 @@ socket_session_state_t socket_session_connect(socket_session_t session, const ch
         }
     }
 
+    if(socket_session_tls_enabled(session)) {
+        if (wolfSSL_set_fd(session->tls->ssl, session->id) != WOLFSSL_SUCCESS) {
+            fprintf(stderr, "ERROR: Failed to set the file descriptor\n");
+            session->state = SOCKET_STATE_ERROR;
+            return SOCKET_STATE_ERROR;
+        }
+
+        if (wolfSSL_connect(session->tls->ssl) != WOLFSSL_SUCCESS) {
+            fprintf(stderr, "ERROR: failed to connect to wolfSSL\n");
+            session->state = SOCKET_STATE_ERROR;
+            return session->state;
+        }
+    }
+
     session->state = SOCKET_STATE_CONNECTED;
 
     return SOCKET_STATE_CONNECTED;
 }
 
-/*
-void socket_session_start(socket_session_t session)
-{
-    // Start monitoring the socket
-    session->thread = macrothread_handle_init();
-    session->thread->detached = true;
-    macrothread_start_thread(session->thread, monitor_thread, session);
-}
-*/
-
 size_t socket_session_read(socket_session_t session, char *buffer, size_t max_bytes)
 {
+    ssize_t bytes_read = 0;
+    if(socket_session_tls_enabled(session)) {
+        bytes_read = wolfSSL_read(session->tls->ssl, buffer, max_bytes);
+        if(bytes_read < 0) {
+            session->state = SOCKET_STATE_ERROR;
+        }
+        return bytes_read >= 0 ? bytes_read : 0;
+    }
+
 	struct pollfd pfd;
-	ssize_t bytes_read = 0;
 	size_t total_bytes_read = 0;
 
 	memset(&pfd, 0, sizeof(struct pollfd));
@@ -225,11 +241,15 @@ size_t socket_session_write(socket_session_t session, const char *buffer, size_t
 	}
 
 	while (bytes_to_write > 0) {
+        if(socket_session_tls_enabled(session)) {
+            bytes_written = wolfSSL_write(session->tls->ssl, write_index, bytes_to_write);
+        } else {
 #ifdef WIN32
-		bytes_written = send(session->id, write_index, (int)bytes_to_write, 0);
+		    bytes_written = send(session->id, write_index, (int)bytes_to_write, 0);
 #else
-		bytes_written = write(session->id, write_index, bytes_to_write);
+		    bytes_written = write(session->id, write_index, bytes_to_write);
 #endif
+        }
 
 		if (bytes_written < 0) {
 #ifdef WIN32
@@ -397,13 +417,27 @@ size_t socket_session_flush(socket_session_t session, size_t bytes_to_flush)
 void socket_session_shutdown(socket_session_t session)
 {
 	if (session->state == SOCKET_STATE_CONNECTED || session->state == SOCKET_STATE_PEER_CLOSED) {
-		session->state = SOCKET_STATE_SHUTDOWN;
-		shutdown(session->id, SHUT_WR);
+        if(socket_session_tls_enabled(session)) {
+            for(size_t i = 0; i < 1000; i++) {
+                if(wolfSSL_shutdown(session->tls->ssl) == SSL_SHUTDOWN_NOT_DONE) {
+                    macrothread_delay(1);
+                    continue;
+                } else {
+                    break;
+                }
+            }
+        } else {
+            shutdown(session->id, SHUT_WR);
+        }
 	}
+    session->state = SOCKET_STATE_SHUTDOWN;
 }
 
 void socket_session_disconnect(socket_session_t session)
 {
+    if(session->state == SOCKET_STATE_CONNECTED || session->state == SOCKET_STATE_PEER_CLOSED) {
+        socket_session_shutdown(session);
+    }
 #ifdef WIN32
 	closesocket(session->id);
 #else
@@ -418,5 +452,10 @@ void socket_session_destroy(socket_session_t session)
     macrothread_mutex_destroy(session->mutex);
     macrothread_condition_destroy(session->condition);
     if(session->buffer != NULL) free(session->buffer);
+    if(session->tls != NULL) {
+        wolfSSL_free(session->tls->ssl);
+        wolfSSL_CTX_free(session->tls->ctx);
+        free(session->tls);
+    }
     free(session);
 }

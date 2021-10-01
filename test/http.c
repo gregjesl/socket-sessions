@@ -42,4 +42,7 @@ int main(void)
 
     // Destroy the signal
     socket_session_destroy(client);
+
+    // Cleanup
+    socket_session_cleanup();
 }
